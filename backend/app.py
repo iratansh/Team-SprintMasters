@@ -28,6 +28,7 @@ from backend.elevenlabs_routes import (
     get_elevenlabs_settings,
     router as elevenlabs_router,
 )
+from backend.email_routes import router as email_router
 
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 logger = logging.getLogger(__name__)
@@ -167,6 +168,7 @@ def create_app(
         description=(
             "Local Backboard connectivity test. GET /health makes no model call. "
             "POST /api/test makes one model request using the server-side key. "
+            "POST /api/email/confirmation sends the configured hotel enquiry proof email. "
             "ElevenLabs routes control an existing agent; calls/preview never dials. "
             "Real calls require both a server-side enable flag and confirm_call=true."
         ),
@@ -176,6 +178,7 @@ def create_app(
     if elevenlabs_settings is not None:
         application.dependency_overrides[get_elevenlabs_settings] = lambda: elevenlabs_settings
     application.include_router(elevenlabs_router)
+    application.include_router(email_router)
 
     @application.exception_handler(RequestValidationError)
     async def validation_error_handler(_request, error: RequestValidationError) -> JSONResponse:

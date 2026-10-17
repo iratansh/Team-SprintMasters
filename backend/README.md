@@ -112,7 +112,55 @@ assistant/thread；测试没有启用搜索、长期记忆或外部工具。`GET
 这是供本机开发的接口，没有应用层登录或公开服务的访问控制；启动命令只绑定
 `127.0.0.1`。需要给前端接入或部署时，再确定跨域与访问控制配置。
 
-## 5. 离线测试
+## 5. Gmail confirmation email
+
+The API can send the hotel enquiry evidence email defined in the team spec. It includes
+the property, address, dialed phone, price, enquiry date, optional reference/staff name,
+and the full transcript. The body explicitly says that no room was booked or held.
+The subject follows the organizer's template: `Team # 20 - Hotel Reservation Confirmed!`.
+
+Copy `backend/.env.example` to `backend/.env` if needed, then configure:
+
+```dotenv
+EMAIL_SENDER=i.ratanshi1@gmail.com
+EMAIL_RECIPIENT=organizer@example.com
+EMAIL_APP_PASSWORD=your-google-app-password
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_TIMEOUT_SECONDS=20
+```
+
+Create a Google App Password from the sender account when 2-Step Verification is enabled;
+do not use the account's normal password. App Passwords may be unavailable for some managed
+accounts or Advanced Protection. SMTP uses `smtp.gmail.com` with STARTTLS on port 587.
+Keep `backend/.env` private and never put these settings in the frontend.
+
+`GET /api/email/status` checks configuration without contacting Gmail. `POST
+/api/email/confirmation` sends one message to the server-configured `EMAIL_RECIPIENT`; the
+request cannot choose a recipient. The transcript is required. A returned `accepted` status
+means Gmail accepted the message, not that it was read. If the API reports
+`email_delivery_unknown`, check the inbox before retrying to avoid a duplicate.
+
+Example request:
+
+```json
+{
+  "hotel_name": "Example Hotel",
+  "address": "123 Example Street, Ottawa, ON",
+  "phone": "+16135550123",
+  "price": "CAD 210 total for two nights, including tax",
+  "reservation_date": "2026-10-17",
+  "reservation_number": null,
+  "confirmed_with": "Front desk",
+  "transcript": "Agent: What is your cheapest available option?\nStaff: CAD 210 total for those dates."
+}
+```
+
+The API does not create a booking or hold. `reservation_date` is required because the
+organizer's current template includes a `Reservation Date` field; provide the applicable
+date from the run rather than treating it as proof of a booking.
+
+## 6. 离线测试
 
 ```bash
 python -m pytest backend/tests -q
