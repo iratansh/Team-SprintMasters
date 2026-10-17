@@ -14,6 +14,7 @@ from dotenv import dotenv_values
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -251,6 +252,8 @@ def create_app(
                 },
             ) from None
 
+    static_dir = Path(__file__).resolve().parent / "static"
+    application.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
     return application
 
 

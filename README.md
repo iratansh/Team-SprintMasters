@@ -18,6 +18,12 @@ for an existing agent with a linked Twilio number. See
 [backend/ELEVENLABS.md](backend/ELEVENLABS.md) for hotel-data previews, guarded
 outbound calls, and conversation transcripts. Real calls are disabled by default.
 
+The backend also serves a local GPT-style chat workspace at `http://127.0.0.1:8000/`.
+Its **Live trace** panel shows the exact submitted prompt, request lifecycle,
+elapsed time, and metadata returned by Backboard. The current API is non-streaming,
+so it cannot show token-by-token output or private model reasoning while a request
+is processing.
+
 The event requirements and phone-call boundaries are in [agent-spec.md](agent-spec.md).
 
 ## Run a live search
