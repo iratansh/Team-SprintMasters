@@ -539,6 +539,94 @@ def test_conversation_preserves_all_original_utterances_separate_from_summary(
     assert fake.calls == [("get_conversation", CONVERSATION_ID)]
 
 
+def model_usage(input_tokens: int, output_tokens: int, cache_read: int = 0) -> dict:
+    return {
+        "input": {"tokens": input_tokens, "price": 0.0},
+        "input_cache_read": {"tokens": cache_read, "price": 0.0},
+        "input_cache_write": {"tokens": 0, "price": 0.0},
+        "output_total": {"tokens": output_tokens, "price": 0.0},
+    }
+
+
+def test_conversation_reports_cost_and_llm_tokens_summed_across_turns() -> None:
+    fake = FakeElevenLabsClient()
+    fake.conversation_response = conversation_response(
+        transcript=[
+            {"role": "user", "message": "Front desk.", "time_in_call_secs": 0},
+            {"role": "agent", "message": "Cheapest room?", "time_in_call_secs": 1,
+             "llm_usage": {"model_usage": {"gpt-4o-mini": model_usage(1200, 40, cache_read=300)}}},
+            {"role": "user", "message": "$95 plus tax.", "time_in_call_secs": 4},
+            {"role": "agent", "message": "Thanks, bye.", "time_in_call_secs": 6,
+             "llm_usage": {"model_usage": {
+                 "gpt-4o-mini": model_usage(1500, 10),
+                 "gemini-2.0-flash": model_usage(200, 5),
+             }}},
+        ],
+        metadata={"call_duration_secs": 7, "cost_fiat": 0.0123,
+                  "charging": {"llm_price": 0.004, "platform_price": 0.0083}},
+    )
+    with offline_client(fake) as client:
+        response = client.get(f"{BASE}/conversations/{CONVERSATION_ID}")
+
+    assert response.status_code == 200
+    usage = response.json()["usage"]
+    assert usage["cost_usd"] == 0.0123
+    assert usage["llm_cost_usd"] == 0.004
+    assert usage["platform_cost_usd"] == 0.0083
+    assert usage["tokens_by_model"] == {
+        "gpt-4o-mini": {"input": 2700, "input_cache_read": 300, "input_cache_write": 0, "output": 50},
+        "gemini-2.0-flash": {"input": 200, "input_cache_read": 0, "input_cache_write": 0, "output": 5},
+    }
+    assert usage["llm_input_tokens"] == 3200
+    assert usage["llm_output_tokens"] == 55
+    assert usage["llm_total_tokens"] == 3255
+
+
+def test_conversation_usage_is_unknown_not_zero_when_upstream_omits_it() -> None:
+    fake = FakeElevenLabsClient()
+    fake.conversation_response = conversation_response(status="in-progress")
+    with offline_client(fake) as client:
+        response = client.get(f"{BASE}/conversations/{CONVERSATION_ID}")
+
+    assert response.status_code == 200
+    usage = response.json()["usage"]
+    assert usage["cost_usd"] is None
+    assert usage["llm_cost_usd"] is None
+    assert usage["platform_cost_usd"] is None
+    assert usage["llm_input_tokens"] is None
+    assert usage["llm_output_tokens"] is None
+    assert usage["llm_total_tokens"] is None
+    assert usage["tokens_by_model"] == {}
+
+
+@pytest.mark.parametrize("metadata,llm_usage", [
+    ({"call_duration_secs": 6, "cost_fiat": "0.01"}, "not-a-dict"),
+    ({"call_duration_secs": 6, "cost_fiat": -1}, {"model_usage": []}),
+    ({"call_duration_secs": 6, "cost_fiat": True, "charging": "bad"}, {"model_usage": {"m": "bad"}}),
+    ({"call_duration_secs": 6, "charging": {"llm_price": float("nan")}},
+     {"model_usage": {"m": {"input": {"tokens": -5}, "output_total": {"tokens": True}}}}),
+    ({"call_duration_secs": 6, "charging": {"platform_price": float("inf")}},
+     {"model_usage": {"m": {"input": {"tokens": "12"}, "output_total": None}}}),
+])
+def test_malformed_usage_is_ignored_without_hiding_the_transcript(metadata: dict, llm_usage: object) -> None:
+    fake = FakeElevenLabsClient()
+    upstream = conversation_response(metadata=metadata)
+    upstream["transcript"][1]["llm_usage"] = llm_usage
+    fake.conversation_response = upstream
+    with offline_client(fake) as client:
+        response = client.get(f"{BASE}/conversations/{CONVERSATION_ID}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "$95 plus tax" in body["transcript_text"]
+    usage = body["usage"]
+    assert usage["cost_usd"] is None
+    assert usage["llm_cost_usd"] is None
+    assert usage["platform_cost_usd"] is None
+    assert usage["llm_total_tokens"] is None
+    assert usage["tokens_by_model"] == {}
+
+
 @pytest.mark.parametrize("overrides", [
     {"agent_id": None},
     {"agent_id": []},
