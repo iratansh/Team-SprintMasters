@@ -1,11 +1,11 @@
-# Hotel Call Flow — Team SprintMasters (v0.3)
+# Hotel Call Flow — Team SprintMasters (v0.3.1)
 
 > How our agent phones a property and turns the call into a valid submission. Owner: Design.
 > Baseline: `agent-spec.md` (team repo, current version). v0.1 was reviewed against the repair brief (F01–F18); see §13.
 >
 > **The call is an enquiry, not a booking.** We confirm availability and a price, optionally ask for a reference, and email the proof. We **never book, never hold a room, never pay**.
 >
-> **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.4.
+> **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.5 (v0.3.1: wording synced; clarification limit counts per field).
 >
 > **Status:** the document logic is fixed and has been walked through on paper (§14). **Nothing has been integration-tested yet:** telephony, DTMF, transcript retrieval and email sending are all still unverified (§12).
 
@@ -160,13 +160,14 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 
 | Moment | English | Français |
 |---|---|---|
-| Opening (after their greeting) | "Hi, my name is {caller_name}. I was wondering what your cheapest option is from {check_in} to {check_out}, for {guests}? And what would the total be, including all taxes and fees?" | « Bonjour, je m'appelle {caller_name}. Je voulais savoir quelle est votre option la moins chère du {check_in} au {check_out}, pour {guests} ? Et ça ferait combien au total, avec toutes les taxes et les frais ? » |
-| Missing: amount | "Sorry, how much was that?" | « Pardon, c'était combien ? » |
-| Missing: per night or total | "Is that per night or for the whole stay?" | « C'est par nuit ou pour tout le séjour ? » |
-| Missing: everyone | "Is that the total for all of us?" | « C'est le total pour tout le monde ? » |
-| Missing: fees | "Does that include all taxes and mandatory fees?" | « Est-ce que ça inclut toutes les taxes et les frais obligatoires ? » |
-| Missing: currency | "Is that in Canadian dollars?" | « C'est en dollars canadiens ? » |
-| Missing: cheapest option | "Is there anything cheaper, like a bed in a shared room?" | « Est-ce qu'il y a quelque chose de moins cher, comme un lit en dortoir ? » |
+| Opening (after their greeting) | "Hi, I was wondering what your cheapest room is for {guests}, from {check_in} to {check_out}? And what would the total be with tax?" (hostel: "cheapest room or bed") | « Bonjour, je voulais savoir quelle est votre chambre la moins chère pour {guests}, du {check_in} au {check_out} ? Et ça ferait combien en tout, avec les taxes ? » |
+| Combined check (amount clear, coverage unclear) | "Is that 180 for both nights, with tax?" | « Donc 180 pour les deux nuits, taxes comprises ? » |
+| Misheard number | "Sorry, was that one fifteen or one fifty?" | « Pardon, c'était cent quinze ou cent cinquante ? » |
+| "Plus tax" | "What's that with tax?" | « Et avec les taxes, ça fait combien ? » |
+| More than one guest only | "Is that for both of us?" | « C'est pour nous deux ? » |
+| Several prices | "Which one's the cheapest?" | « C'est laquelle la moins chère ? » |
+| Not sure it's cheapest | "Is that your cheapest room?" (hostel: "anything cheaper, like a bed in a shared room?") | « C'est votre chambre la moins chère ? » |
+| "Check our website" | "I'm on the phone with you now. Could you just tell me the cheapest total?" | « Je suis au téléphone avec vous, là. Vous pouvez juste me dire le total le moins cher ? » |
 | Reference (optional) | "Is there a reference number for that quote?" | « Est-ce qu'il y a un numéro de référence pour ce prix ? » |
 | Card asked | "I'm just checking prices for now, so no card. Could you still tell me the total?" | « Je regarde seulement les prix pour l'instant, donc pas de carte. Vous pouvez quand même me dire le total ? » |
 | Offer to book / hold | "No thanks, I'm just checking prices for now." | « Non merci, je regarde seulement les prix pour l'instant. » |
@@ -212,7 +213,11 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 | Wrong property / same name, different address | Don't mix data | `wrong_property` → next |
 | Card requested | Decline | Continue, or `payment_required` |
 | French / unknown language | Switch / one check | Continue, or `unsupported_language` |
-| Bad line | Repeat → read back, `clarification_limit` | `line_failure` / `unconfirmed` |
+| Bad line | Ask only about the missed part; `clarification_limit` per field | `line_failure` / `unconfirmed` |
+| "Check our website" / "book online" | Ask once for the cheapest total on the phone | Still refused → `unconfirmed` → next |
+| "89 plus tax", can't say the total | Record the exact words (e.g. "89 + HST"); agent doesn't calculate | Orchestrator decides if comparable (§7) |
+| Closed / not taking guests | Apologise, end the call | `unavailable` → next |
+| Questions back (membership, bed type, arrival time) | "No" / "Whatever's cheapest" / "Not sure yet" | Continue |
 
 ---
 
@@ -299,7 +304,7 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 | `hold_timeout_s` | 90 | Suggested default (from v0.1) |
 | `call_budget_s` | 240 | Suggested default; does not reset on hold or transfer |
 | `run_budget_s` | 1200 (20 min) | Suggested default; fits the 17:15–17:45 window and includes evidence + email time |
-| `clarification_limit` | 2 | Suggested default |
+| `clarification_limit` | 2 failed tries **on the same field** (not per call) | Suggested default |
 | `candidate_limit` | 5 | Suggested default |
 | `retry_same_number` | 0 | Suggested default |
 | `research_extra_candidates` | off (if on: max 1 extra search) | Suggested default |
