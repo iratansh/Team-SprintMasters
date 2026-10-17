@@ -1,5 +1,6 @@
 """Local API bridge from hotel-search data to an existing ElevenLabs agent."""
 
+import math
 import os
 import re
 from collections.abc import AsyncIterator
@@ -305,6 +306,61 @@ class ConversationAnalysis(BaseModel):
     data_collection_results: dict | None = None
 
 
+TOKEN_CATEGORIES = {
+    "input": "input", "input_cache_read": "input_cache_read",
+    "input_cache_write": "input_cache_write", "output_total": "output",
+}
+
+
+def _usd(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if math.isfinite(value) and value >= 0 else None
+
+
+def _tokens(category: object) -> int | None:
+    value = category.get("tokens") if isinstance(category, dict) else None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def summarize_usage(data: dict) -> dict:
+    """Best-effort cost and LLM token totals; unknown stays None, never 0.
+
+    Usage data is optional reporting: malformed parts are skipped so they can
+    never hide the transcript, which is the call's actual evidence.
+    """
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    charging = metadata.get("charging") if isinstance(metadata.get("charging"), dict) else {}
+    by_model: dict[str, dict[str, int]] = {}
+    for turn in data.get("transcript") or []:
+        usage = turn.get("llm_usage") if isinstance(turn, dict) else None
+        models = usage.get("model_usage") if isinstance(usage, dict) else None
+        if not isinstance(models, dict):
+            continue
+        for model, categories in models.items():
+            if not isinstance(model, str) or not isinstance(categories, dict):
+                continue
+            for source, target in TOKEN_CATEGORIES.items():
+                tokens = _tokens(categories.get(source))
+                if tokens is not None:
+                    totals = by_model.setdefault(model, dict.fromkeys(TOKEN_CATEGORIES.values(), 0))
+                    totals[target] += tokens
+    input_tokens = sum(m["input"] + m["input_cache_read"] + m["input_cache_write"] for m in by_model.values())
+    output_tokens = sum(m["output"] for m in by_model.values())
+    return {
+        "cost_usd": _usd(metadata.get("cost_fiat")),
+        "llm_cost_usd": _usd(charging.get("llm_price")),
+        "platform_cost_usd": _usd(charging.get("platform_price")),
+        "llm_input_tokens": input_tokens if by_model else None,
+        "llm_output_tokens": output_tokens if by_model else None,
+        "llm_total_tokens": input_tokens + output_tokens if by_model else None,
+        "tokens_by_model": by_model,
+        "token_source": "transcript[].llm_usage.model_usage",
+    }
+
+
 @router.get("/conversations/{conversation_id}", summary="Read call status and every original transcript utterance")
 async def conversation(
     conversation_id: Annotated[str, PathParam(pattern=ID_PATTERN)], config: Config, client: Client,
@@ -345,6 +401,7 @@ async def conversation(
             "call_successful": analysis.call_successful,
             "transcript_summary": analysis.transcript_summary,
             "data_collection_results": analysis.data_collection_results or {},
+            "usage": summarize_usage(data),
         }
     except ElevenLabsError as error:
         raise upstream_error(error) from None
