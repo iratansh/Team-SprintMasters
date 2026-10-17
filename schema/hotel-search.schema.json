@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sprintmasters.example/schemas/hotel-search/1.0.0",
+  "title": "SprintMasters hotel search result",
+  "description": "Sourced online candidates, never phone-confirmed availability. Additional fields are allowed for compatible extensions.",
+  "type": "object",
+  "required": ["schema_version", "mode", "status", "completed_at", "request", "hotels", "shortlist", "errors"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "run_id": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["live", "fixture"]},
+    "status": {"enum": ["success", "partial", "no_results", "error"]},
+    "started_at": {"$ref": "#/$defs/timestamp"},
+    "completed_at": {"$ref": "#/$defs/timestamp"},
+    "request": {"anyOf": [{"$ref": "#/$defs/request"}, {"type": "null"}]},
+    "coverage": {"$ref": "#/$defs/coverage"},
+    "ranking": {
+      "type": "object",
+      "required": ["method", "globally_comparable", "shortlist_size"],
+      "properties": {
+        "method": {"const": "full_stay_amount_ascending_within_currency_tax_and_unit_groups"},
+        "globally_comparable": {"const": false},
+        "shortlist_size": {"type": "integer", "minimum": 1, "maximum": 50}
+      }
+    },
+    "hotels": {"type": "array", "items": {"$ref": "#/$defs/hotel"}},
+    "shortlist": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/candidateId"}},
+    "enquiry_shortlist": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/candidateId"}},
+    "metrics": {
+      "type": "object",
+      "required": ["elapsed_ms", "search_ms", "details_ms", "http_requests", "llm_tokens", "estimated_api_cost"],
+      "properties": {
+        "elapsed_ms": {"$ref": "#/$defs/counter"},
+        "search_ms": {"$ref": "#/$defs/counter"},
+        "details_ms": {"$ref": "#/$defs/counter"},
+        "http_requests": {"$ref": "#/$defs/counter"},
+        "llm_tokens": {"$ref": "#/$defs/counter"},
+        "estimated_api_cost": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "warnings": {"$ref": "#/$defs/stringList"},
+    "errors": {"type": "array", "items": {"$ref": "#/$defs/error"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"enum": ["success", "partial", "no_results"]}}},
+      "then": {
+        "required": ["run_id", "started_at", "coverage", "ranking", "metrics", "warnings"],
+        "properties": {"request": {"$ref": "#/$defs/request"}}
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "success"}}},
+      "then": {"properties": {"hotels": {"minItems": 1}, "errors": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"status": {"const": "partial"}}},
+      "then": {"properties": {"hotels": {"minItems": 1}}}
+    },
+    {
+      "if": {"properties": {"status": {"const": "no_results"}}},
+      "then": {"properties": {"hotels": {"maxItems": 0}, "shortlist": {"maxItems": 0}, "errors": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"status": {"const": "error"}}},
+      "then": {"properties": {"hotels": {"maxItems": 0}, "shortlist": {"maxItems": 0}, "errors": {"minItems": 1}}}
+    },
+    {
+      "if": {"properties": {"mode": {"const": "fixture"}}},
+      "then": {
+        "properties": {
+          "shortlist": {"maxItems": 0},
+          "enquiry_shortlist": {"maxItems": 0},
+          "hotels": {"items": {"properties": {"call_ready": {"const": false}, "enquiry_ready": {"const": false}}}}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "counter": {"type": "integer", "minimum": 0},
+    "timestamp": {"type": "string", "format": "date-time", "minLength": 1},
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "format": "date"},
+    "nullableText": {"type": ["string", "null"]},
+    "nullableUrl": {"type": ["string", "null"], "pattern": "^https?://[^/\\s]+", "format": "uri"},
+    "amount": {"type": ["number", "null"], "exclusiveMinimum": 0, "exclusiveMaximum": 10000000},
+    "candidateId": {"type": "string", "pattern": "^hotel_[0-9a-f]{16}$"},
+    "stringList": {"type": "array", "items": {"type": "string"}},
+    "stay": {
+      "type": "object",
+      "required": ["check_in", "check_out", "nights", "guests"],
+      "properties": {
+        "check_in": {"$ref": "#/$defs/date"},
+        "check_out": {"$ref": "#/$defs/date"},
+        "nights": {"type": "integer", "minimum": 1, "maximum": 365},
+        "guests": {"type": "integer", "minimum": 1, "maximum": 20}
+      }
+    },
+    "request": {
+      "allOf": [{"$ref": "#/$defs/stay"}],
+      "type": "object",
+      "required": ["city", "currency", "province", "country"],
+      "properties": {
+        "city": {"type": ["string", "null"], "minLength": 1, "maxLength": 120, "pattern": "^(?=.*\\S)[^\\u0000-\\u001f]+$"},
+        "scope": {"enum": ["province", "city"]},
+        "currency": {"const": "CAD"},
+        "province": {"const": "Ontario"},
+        "country": {"const": "Canada"}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["provider", "max_pages_per_mode", "modes", "candidate_limit", "candidates_seen", "candidates_returned", "candidate_limit_applied", "all_market_coverage"],
+      "properties": {
+        "provider": {"enum": ["direct_web", "serpapi_google_hotels", "synthetic_fixture"]},
+        "geographic_scope": {"enum": ["province", "city"]},
+        "search_location": {"type": "string", "minLength": 1},
+        "source_details": {
+          "type": "object",
+          "properties": {
+            "requested_platforms": {"$ref": "#/$defs/stringList"},
+            "paid_search_requests": {"$ref": "#/$defs/counter"},
+            "platform_status": {"type": "array", "items": {"$ref": "#/$defs/platformStatus"}}
+          }
+        },
+        "max_pages_per_mode": {"type": "integer", "minimum": 1, "maximum": 10},
+        "modes": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["mode", "pages_fetched", "has_more_pages", "stop_reason"],
+            "properties": {
+              "mode": {"enum": ["hotels", "vacation_rentals"]},
+              "pages_fetched": {"$ref": "#/$defs/counter"},
+              "has_more_pages": {"type": "boolean"},
+              "stop_reason": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "candidate_limit": {"type": ["integer", "null"], "minimum": 1, "maximum": 500},
+        "candidates_seen": {"$ref": "#/$defs/counter"},
+        "candidates_returned": {"$ref": "#/$defs/counter"},
+        "candidate_limit_applied": {"type": "boolean"},
+        "all_market_coverage": {"const": false}
+      }
+    },
+    "error": {
+      "type": "object", "required": ["code"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "message": {"type": "string"},
+        "step": {"type": "string"},
+        "property_name": {"type": "string"}
+      }
+    },
+    "quote": {
+      "type": "object",
+      "required": ["amount", "currency", "basis", "tax_fee_status", "before_taxes_fees_amount", "nightly_amount", "nightly_before_taxes_fees_amount", "price_unit", "num_guests", "occupancy_matches", "currency_matches", "rate_eligibility", "conditions", "provider", "booking_url", "source_url", "observed_at", "retrieved_at", "raw"],
+      "properties": {
+        "amount": {"$ref": "#/$defs/amount"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "basis": {"enum": ["stay", "unknown"]},
+        "tax_fee_status": {"enum": ["unknown", "excluded", "included"]},
+        "before_taxes_fees_amount": {"$ref": "#/$defs/amount"},
+        "nightly_amount": {"$ref": "#/$defs/amount"},
+        "nightly_before_taxes_fees_amount": {"$ref": "#/$defs/amount"},
+        "price_unit": {"type": "string", "minLength": 1},
+        "num_guests": {"type": ["integer", "null"], "minimum": 1},
+        "num_guests_is_capacity": {"type": "boolean"},
+        "occupancy_matches": {"type": "boolean"},
+        "currency_matches": {"type": "boolean"},
+        "rate_eligibility": {"enum": ["restricted", "no_restrictions_reported", "not_established"]},
+        "conditions": {"$ref": "#/$defs/stringList"},
+        "provider": {"$ref": "#/$defs/nullableText"},
+        "booking_url": {"$ref": "#/$defs/nullableUrl"},
+        "source_url": {"$ref": "#/$defs/nullableUrl"},
+        "observed_at": {"$ref": "#/$defs/nullableText"},
+        "retrieved_at": {"$ref": "#/$defs/timestamp"},
+        "raw": {"type": "object"}
+      }
+    },
+    "platformStatus": {
+      "type": "object",
+      "required": ["platform", "direct_search_status", "direct_candidates", "supplier_offers", "discovery_methods"],
+      "properties": {
+        "platform": {"type": "string", "minLength": 1},
+        "direct_search_status": {"enum": ["success", "no_results", "fallback", "blocked", "unavailable", "not_requested"]},
+        "direct_candidates": {"$ref": "#/$defs/counter"},
+        "supplier_offers": {"$ref": "#/$defs/counter"},
+        "discovery_methods": {"$ref": "#/$defs/stringList"},
+        "search_url": {"$ref": "#/$defs/nullableUrl"},
+        "error_code": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    },
+    "platformOffer": {
+      "type": "object",
+      "required": ["platform", "discovery_method", "source_url", "amount", "currency", "basis", "scope_verified"],
+      "properties": {
+        "platform": {"type": "string", "minLength": 1},
+        "provider": {"$ref": "#/$defs/nullableText"},
+        "listing_id": {"type": ["string", "integer", "null"]},
+        "listing_url": {"$ref": "#/$defs/nullableUrl"},
+        "booking_url": {"$ref": "#/$defs/nullableUrl"},
+        "source_url": {"$ref": "#/$defs/nullableUrl"},
+        "amount": {"$ref": "#/$defs/amount"},
+        "currency": {"type": ["string", "null"], "pattern": "^[A-Z]{3}$"},
+        "basis": {"enum": ["stay", "night", "unknown"]},
+        "check_in": {"anyOf": [{"$ref": "#/$defs/date"}, {"type": "null"}]},
+        "check_out": {"anyOf": [{"$ref": "#/$defs/date"}, {"type": "null"}]},
+        "guests": {"type": ["integer", "null"], "minimum": 1},
+        "scope_verified": {"type": "boolean"},
+        "discovery_method": {"type": "string", "minLength": 1}
+      }
+    },
+    "hotel": {
+      "type": "object",
+      "required": ["candidate_id", "rank", "ranking_group", "property_name", "property_type", "address", "phone", "phone_raw", "phone_extension", "website", "property_token", "location_status", "stay", "online_quote", "online_offers", "availability_status", "phone_verification_required", "call_ready", "not_call_ready_reasons", "source_url", "observed_at", "retrieved_at", "warnings"],
+      "properties": {
+        "candidate_id": {"$ref": "#/$defs/candidateId"},
+        "rank": {"type": "integer", "minimum": 1},
+        "ranking_group": {"type": "string", "minLength": 1},
+        "property_name": {"type": "string", "minLength": 1},
+        "property_type": {"type": "string", "minLength": 1},
+        "address": {"$ref": "#/$defs/nullableText"},
+        "phone": {"type": ["string", "null"], "pattern": "^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$"},
+        "phone_raw": {"$ref": "#/$defs/nullableText"},
+        "phone_extension": {"type": ["string", "null"], "pattern": "^[0-9]+$"},
+        "website": {"$ref": "#/$defs/nullableUrl"},
+        "property_token": {"$ref": "#/$defs/nullableText"},
+        "location_status": {"enum": ["matched", "outside_requested_city", "outside_requested_province", "unknown"]},
+        "stay": {"$ref": "#/$defs/stay"},
+        "online_quote": {"$ref": "#/$defs/quote"},
+        "online_offers": {"type": "array", "items": {"$ref": "#/$defs/quote"}},
+        "availability_status": {"enum": ["online_rate_found", "unknown"]},
+        "phone_verification_required": {"const": true},
+        "call_ready": {"type": "boolean"},
+        "enquiry_ready": {"type": "boolean"},
+        "platforms": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "platform_offers": {"type": "array", "items": {"$ref": "#/$defs/platformOffer"}},
+        "fixture_would_be_call_ready": {"type": "boolean"},
+        "not_call_ready_reasons": {"$ref": "#/$defs/stringList"},
+        "source_url": {"$ref": "#/$defs/nullableUrl"},
+        "observed_at": {"$ref": "#/$defs/nullableText"},
+        "retrieved_at": {"$ref": "#/$defs/timestamp"},
+        "warnings": {"$ref": "#/$defs/stringList"}
+      }
+    }
+  }
+}

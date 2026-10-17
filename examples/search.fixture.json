@@ -1,0 +1,44 @@
+{
+  "synthetic_fixture": true,
+  "description": "Invented integration data. Not real properties, quotes, availability or dialable destinations.",
+  "request": {
+    "city": null,
+    "check_in": "2026-11-06",
+    "check_out": "2026-11-08",
+    "guests": 1
+  },
+  "search_pages": [
+    {
+      "input_page_token": null,
+      "response": {
+        "search_metadata": {"status": "Success", "created_at": "2026-10-17T15:30:00Z"},
+        "search_parameters": {"check_in_date": "2026-11-06", "check_out_date": "2026-11-08", "adults": 1, "currency": "CAD"},
+        "properties": [
+          {"name": "Example Harbour Inn", "type": "hotel", "property_token": "demo_harbour", "total_rate": {"lowest": "CA$190", "extracted_lowest": 190}},
+          {"name": "Example Maple Motel", "type": "hotel", "property_token": "demo_maple", "total_rate": {"lowest": "CA$160", "extracted_lowest": 160}},
+          {"name": "Example Nightly Only Hostel", "type": "hostel", "property_token": "demo_hostel", "rate_per_night": {"lowest": "CA$50", "extracted_lowest": 50}}
+        ]
+      }
+    }
+  ],
+  "details": {
+    "demo_harbour": {
+      "name": "Example Harbour Inn", "type": "hotel", "property_token": "demo_harbour",
+      "address": "100 Example Road, Kingston, ON K7L 0A1, Canada", "phone": "+1 613-555-0101", "phone_link": "tel:+16135550101",
+      "link": "https://example.com/harbour",
+      "total_rate": {"lowest": "CA$190", "extracted_lowest": 190, "extracted_before_taxes_fees": 170},
+      "prices": [{"source": "Example booking provider", "link": "https://example.com/harbour/quote", "num_guests": 1, "total_rate": {"lowest": "CA$190", "extracted_lowest": 190, "extracted_before_taxes_fees": 170}}]
+    },
+    "demo_maple": {
+      "name": "Example Maple Motel", "type": "hotel", "property_token": "demo_maple",
+      "address": "200 Example Road, Ottawa, ON K1A 0B1, Canada", "phone": "613-555-0102", "link": "https://example.com/maple",
+      "total_rate": {"lowest": "CA$160", "extracted_lowest": 160},
+      "rate_per_night": {"lowest": "CA$80", "extracted_lowest": 80}
+    },
+    "demo_hostel": {
+      "name": "Example Nightly Only Hostel", "type": "hostel", "property_token": "demo_hostel",
+      "address": "300 Example Road, Thunder Bay, ON P7A 0A1, Canada", "phone": "+1 613-555-0103", "link": "https://example.com/hostel",
+      "rate_per_night": {"lowest": "CA$50", "extracted_lowest": 50}
+    }
+  }
+}
