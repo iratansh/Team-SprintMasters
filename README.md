@@ -10,6 +10,16 @@ Python **3.11+** is required. There are **no third-party runtime dependencies**,
 model calls, browser automation, phone calls or email sends in this module.
 Project rules: [agent spec](agent-spec.md), including the team's Ontario-wide scope correction.
 
+## Python API backend
+
+A FastAPI service adds Backboard connectivity testing and an ElevenLabs adapter
+for an existing agent with a linked Twilio number. See
+[backend/README.md](backend/README.md) for setup and Backboard testing, and
+[backend/ELEVENLABS.md](backend/ELEVENLABS.md) for hotel-data previews, guarded
+outbound calls, and conversation transcripts. Real calls are disabled by default.
+
+The event requirements and phone-call boundaries are in [agent-spec.md](agent-spec.md).
+
 ## Run a live search
 
 From the repository root, run the following command. No setup, API key or
