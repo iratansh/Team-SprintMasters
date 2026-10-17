@@ -4,12 +4,13 @@
 > Sources: the official Notion page and the host's kickoff talk + Q&A (10:07).
 > Where the two disagree, **the host's spoken clarification wins**, marked ⚡.
 > Purpose: one page the whole team agrees on before we split up work.
+> Search scope correction (team instruction, Oct 17): search across all Ontario by default, without requiring a city. A city is an optional filter when explicitly supplied. This supersedes the earlier city-only search assumption below.
 
 ---
 
 ## 1. Goal (one sentence)
 
-**Given one prompt (city + dates), our agent finds the cheapest stay online, phones the property to confirm availability and price, and emails the proof, faster and with fewer tokens than every other team.**
+**Given one prompt (dates + stay requirements, optionally a city), our agent finds the cheapest stay online across Ontario, phones the property to confirm availability and price, and emails the proof, faster and with fewer tokens than every other team.**
 
 ## 2. How we win
 
@@ -30,7 +31,7 @@
 
 - **Exactly one prompt**, published on Notion at ~**5:00 PM**, e.g. *"I want to go to X on [date] for 1–2 nights, find me the cheapest stay."*
 - The UI is a **single text field**. The agent gets nothing else. No follow-up questions, no manual steps.
-- The city is **somewhere in Ontario, not Toronto**, and is revealed only in the prompt.
+- Search scope is **the entire province of Ontario**. A city is optional and restricts the search only when explicitly requested. Do not impose a Toronto exclusion unless the competition prompt specifies one.
 
 ## 4. Output: the email
 
@@ -62,8 +63,8 @@ _____                        ← REQUIRED proof the call happened
 ## 5. What the agent does (pipeline)
 
 ```
-1. Parse prompt        → city, check-in, check-out, nights, guests
-2. Search              → cheapest stays in that city (any type) via APIs / search / own scraper
+1. Parse prompt        → check-in, check-out, nights, guests, optional city
+2. Search              → cheapest stays across Ontario (or an explicitly requested city; any type) via APIs / search / own scraper
 3. Rank                → by total price; keep a fallback queue (#2, #3 …)
 4. Call #1             → ElevenLabs voice agent: confirm availability, dates, price
        ↳ no answer / no vacancy / price mismatch → call next in queue
