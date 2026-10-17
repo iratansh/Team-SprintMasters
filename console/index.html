@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call Console · Team 20</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060807; --panel:#0c100e; --panel-2:#111714; --line:#1a221e;
+  --text:#c8d3cc; --muted:#64746b; --dim:#3b4740;
+  --green:#3dff8b; --green-bg:rgba(61,255,139,.10);
+  --amber:#ffb23e; --amber-bg:rgba(255,178,62,.10);
+  --red:#ff4d5e; --red-bg:rgba(255,77,94,.12);
+  --cyan:#4cd4ff; --cyan-bg:rgba(76,212,255,.10);
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 var(--mono)}
+body{padding:16px;min-height:100vh}
+button{font:inherit;color:inherit;background:var(--panel-2);border:none;border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{background:#18201c}
+button:focus-visible,input:focus-visible{outline:1px solid var(--green);outline-offset:1px}
+input{font:inherit;color:var(--text);background:var(--bg);border:none;border-radius:6px;padding:6px 8px;width:100%}
+.wrap{max-width:1280px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.brand{color:var(--green);font-weight:700;letter-spacing:.5px;margin-right:8px}
+.brand span{color:var(--muted);font-weight:400}
+.chip{font-size:12px;padding:3px 9px}
+.ok{background:var(--green-bg);color:var(--green)} .warn{background:var(--amber-bg);color:var(--amber)}
+.bad{background:var(--red-bg);color:var(--red)} .acc{background:var(--cyan-bg);color:var(--cyan)}
+.mut{background:var(--panel-2);color:var(--muted)}
+.mode{margin-left:auto;color:var(--amber);font-size:12px}
+.why{margin-top:10px;padding:10px 12px;border-radius:6px;font-size:12.5px;display:none}
+.why b{font-weight:700}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:12px;margin-top:12px}
+.panel{background:var(--panel);border-radius:10px;padding:12px}
+.ph{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.ph .t{color:var(--green);font-weight:700}
+.ph .s{margin-left:auto;color:var(--muted);font-size:11px}
+.row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px;border-radius:6px;cursor:pointer}
+.row:hover{background:var(--panel-2)} .row.sel{background:var(--cyan-bg);box-shadow:inset 2px 0 0 var(--cyan)}
+.row .n{color:var(--dim)} .row .nm{font-weight:500;color:#e6efe9} .row .pr{color:var(--green)}
+.row .sub{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:10.5px;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.actions{display:flex;gap:6px;margin-top:10px}
+.danger{background:var(--red);color:#120204;font-weight:700} .danger:hover{background:#ff6b79}
+.armed{background:var(--amber);color:#160d00} .armed:hover{background:#ffc566}
+.ghost{background:transparent;color:var(--muted);width:100%;margin-top:6px;text-align:left}
+.ghost:hover{color:var(--text);background:transparent}
+.manual{display:none;margin-top:6px;gap:6px;grid-template-columns:1fr 1fr}
+.manual label{color:var(--muted);font-size:11px}
+.steps{display:flex;gap:4px;margin-bottom:10px}
+.steps span{flex:1;text-align:center;padding:4px;border-radius:4px;font-size:11px;background:var(--panel-2);color:var(--dim)}
+.steps span.done{color:var(--muted)} .steps span.on{background:var(--cyan-bg);color:var(--cyan)}
+.steps span.fail{background:var(--red-bg);color:var(--red)} .steps span.fin{background:var(--green-bg);color:var(--green)}
+.timer{font-size:18px;color:var(--green);font-weight:700}
+.log{display:flex;flex-direction:column;gap:6px;min-height:280px;max-height:420px;overflow:auto;padding-right:4px}
+.msg{max-width:82%;padding:7px 10px;border-radius:8px}
+.msg .w{font-size:10.5px;color:var(--muted);display:block}
+.hotel{align-self:flex-start;background:var(--panel-2)}
+.agent{align-self:flex-end;background:var(--cyan-bg);color:#bfeeff}
+.agent .w{color:#3a9fc2}
+.sys{align-self:center;color:var(--muted);font-size:11px}
+mark{background:var(--amber-bg);color:var(--amber);padding:0 2px;border-radius:3px}
+.empty{color:var(--dim);margin:auto;text-align:center}
+.cursor::after{content:"▋";color:var(--green);animation:b 1s steps(1) infinite;margin-left:2px}
+@keyframes b{50%{opacity:0}}
+.stats{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:12px}
+.stat.click{cursor:pointer}.stat.click:hover{background:var(--panel-2)}
+.stat .h{color:var(--dim);font-size:10.5px}
+textarea{font:inherit;color:var(--text);background:var(--bg);border:none;border-radius:6px;padding:8px;width:100%;min-height:140px;resize:vertical}
+.stat{background:var(--panel);border-radius:8px;padding:10px 12px}
+.stat .l{color:var(--muted);font-size:11px} .stat .v{font-size:20px;font-weight:700;color:#e6efe9}
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.drawer{display:none;margin-top:12px;background:var(--panel);border-radius:10px;padding:12px}
+.drawer pre{margin:0;white-space:pre-wrap;word-break:break-word;color:var(--text);font-size:12px}
+.hist{margin-top:12px}
+.hist table{width:100%;border-collapse:collapse;font-size:12px}
+.hist td,.hist th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.hist th{color:var(--muted);font-weight:400}
+.foot{color:var(--dim);font-size:11px;margin-top:14px}
+@media (max-width:1100px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:860px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:reduce){.cursor::after{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top" id="health">
+    <span class="brand">&gt;_ CALL CONSOLE <span>// team 20</span></span>
+  </div>
+  <div class="why" id="why"></div>
+
+  <div class="grid">
+    <section class="panel" aria-label="Price rank">
+      <div class="ph"><span class="t">PRICE RANK</span><span class="s" id="qsrc">mock data</span></div>
+      <div id="queue"></div>
+      <div class="actions">
+        <button id="previewBtn" style="flex:1">Preview</button>
+        <button id="callBtn" class="danger" style="flex:1.6">Call</button>
+      </div>
+      <button class="ghost" id="manualToggle">+ manual call / test number</button>
+      <div class="manual" id="manual">
+        <div><label>hotel</label><input id="mName" value="Teammate test"></div>
+        <div><label>phone</label><input id="mPhone" value="+1 416 555 0199"></div>
+        <div><label>check-in</label><input id="mIn" value="2026-10-24"></div>
+        <div><label>check-out</label><input id="mOut" value="2026-10-26"></div>
+        <div><label>guests</label><input id="mGuests" value="1"></div>
+        <div style="display:flex;align-items:end"><button id="mUse" style="width:100%">Use manual</button></div>
+      </div>
+      <button class="ghost" id="loadBtn">+ load hotels.json</button>
+      <button class="ghost" id="convBtn">+ load real call (conversation JSON)</button>
+      <input type="file" id="convFile" accept=".json,application/json" hidden>
+      <input type="file" id="file" accept=".json,application/json" hidden>
+    </section>
+
+    <section class="panel" aria-label="Live call">
+      <div class="ph">
+        <span class="t" id="cName">NO ACTIVE CALL</span>
+        <span style="color:var(--muted);font-size:12px" id="cPhone"></span>
+        <span class="s timer" id="timer">00:00</span>
+      </div>
+      <div class="steps" id="steps">
+        <span>dialing</span><span>in call</span><span>processing</span><span>done</span>
+      </div>
+      <div class="log" id="log" aria-live="polite"><div class="empty">select a hotel and press Call<br><span class="cursor"></span></div></div>
+    </section>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="l">phone total</div><div class="v" id="sTotal">—</div></div>
+    <div class="stat"><div class="l">vs online</div><div class="v" id="sDiff">—</div></div>
+    <div class="stat"><div class="l">availability</div><div class="v" id="sAvail">—</div></div>
+    <div class="stat"><div class="l">call time</div><div class="v" id="sTime">—</div></div>
+    <div class="stat click" id="tokCard" title="click for per-model breakdown"><div class="l">llm tokens</div><div class="v" id="sTok">—</div><div class="h" id="sTokH">in / out</div></div>
+    <div class="stat"><div class="l">call cost</div><div class="v" id="sCost">—</div><div class="h" id="sCostH">usd</div></div>
+    <div class="stat"><div class="l">next up</div><div class="v" id="sNext" style="font-size:15px;padding-top:4px">—</div></div>
+  </div>
+  <div class="bar">
+    <button id="emailBtn">Email preview</button>
+    <button id="copyBtn">Copy transcript</button>
+    <button id="exportBtn">Export test log</button>
+    <span id="toast" style="color:var(--green);align-self:center;font-size:12px"></span>
+  </div>
+
+  <div class="drawer" id="drawer"><div class="ph"><span class="t" id="dTitle"></span><button class="s" id="dClose" style="margin-left:auto">close</button></div><pre id="dBody"></pre></div>
+
+  <div class="panel hist">
+    <div class="ph"><span class="t">SESSION LOG</span><span style="color:var(--green);font-size:12px" id="sessTot"></span><span class="s">not saved · lost on reload</span></div>
+    <table><thead><tr><th>time</th><th>hotel</th><th>outcome</th><th>phone total</th><th>online</th><th>duration</th><th>tokens</th><th>cost</th></tr></thead><tbody id="hist"><tr><td colspan="8" style="color:var(--dim)">no calls yet</td></tr></tbody></table>
+  </div>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+// ---------- Mock backend (replace with fetch() calls to /api/elevenlabs/* in live mode) ----------
+let MODE = "mock", STATUS = null, BASE = defaultBase();
+const MOCK_STATUS = {
+  api_key_configured: true, agent_id_configured: true,
+  phone_number_id_configured: false, outbound_calls_enabled: false,
+  agent: { name: "Hotel price caller", language: "en", first_message: "",
+           prompt_variables: ["check_in","check_out","guests","hotel_name","hotel_phone","nights"] },
+  backend_variables: ["hotel_name","hotel_phone","check_in","check_out","nights","guests"]
+};
+
+const STAY = { check_in: "2026-10-24", check_out: "2026-10-26", guests: 1 };
+
+let hotels = [
+  { id:"c1", name:"Kingston Hostel", type:"hostel", unit:"dorm bed", phone:"+1 613 555 0111", online:64,  tax:"unknown",  platform:"Hostelworld", call_ready:true },
+  { id:"c2", name:"Maple Inn",       type:"hotel",  unit:"queen",    phone:"+1 613 555 0123", online:178, tax:"included", platform:"Booking",     call_ready:true },
+  { id:"c3", name:"Bay Motel",       type:"motel",  unit:"double",   phone:"+1 613 555 0145", online:185, tax:"included", platform:"Google",      call_ready:true },
+  { id:"c4", name:"Ridgeway B&B",    type:"b&b",    unit:"room",     phone:"+1 613 555 0167", online:192, tax:"excluded", platform:"Airbnb",      call_ready:true },
+  { id:"c5", name:"Riverside Inn",   type:"hotel",  unit:"queen",    phone:null,              online:199, tax:"included", platform:"Expedia",     call_ready:false, reason:"no phone number found" }
+].map(h => ({...h, status:"", outcome:null}));
+
+const SCRIPTS = {
+  c1: { fail:"no_answer", lines:[] },
+  c2: { total:201, avail:true, lines:[
+    ["hotel",0,"Good afternoon, Maple Inn."],
+    ["agent",2,"Hi, I was wondering what your cheapest room is for one person, from October 24th to the 26th? And what's the total for the whole stay, including tax and any required fees?"],
+    ["hotel",11,"Our standard queen is $89 a night plus tax."],
+    ["agent",15,"What's the total with tax and any fees?"],
+    ["hotel",19,"That comes to $201 for the two nights."],
+    ["agent",23,"Okay, thanks. Bye."]]},
+  c3: { total:179, avail:true, lines:[
+    ["hotel",0,"Bay Motel, how can I help?"],
+    ["agent",2,"Hi, I was wondering what your cheapest room is for one person, from October 24th to the 26th? And what's the total for the whole stay, including tax and any required fees?"],
+    ["hotel",10,"Let me check..."],
+    ["sys",13,"hold · agent silent"],
+    ["hotel",21,"Yeah, a double is $179 total, tax included."],
+    ["agent",25,"Okay, thanks. Bye."]]},
+  default: { total:null, avail:null, lines:[
+    ["hotel",0,"Hello?"],
+    ["agent",2,"Hi, I was wondering what your cheapest room is for one person, from October 24th to the 26th?"],
+    ["hotel",8,"It's on our website."],
+    ["agent",10,"Sure. Could you quickly confirm the total for those dates?"],
+    ["hotel",14,"Sorry, we're busy, check online."],
+    ["agent",16,"Okay, thanks anyway. Bye."]]}
+};
+
+// ---------- Health bar ----------
+const REASONS = {
+  api:   ["API key", s=>s.api_key_configured, "ok", "ELEVENLABS_API_KEY is set in backend/.env.",
+          "bad", "ELEVENLABS_API_KEY is empty. Add the key to backend/.env and restart the backend."],
+  agent: ["Agent", s=>s.agent_id_configured, "ok", s=>`Agent found: "${s.agent.name}" · language ${s.agent.language} · first message ${s.agent.first_message?"set (should be empty)":"empty (waits for reception)"}.`,
+          "bad", s=>s.agentErr ? `Couldn't read the agent (${s.agentErr.code}): ${s.agentErr.message}` : "ELEVENLABS_AGENT_ID is empty or the agent can't be read. Check the ID in backend/.env."],
+  phone: ["Phone number", s=>s.phone_number_id_configured, "ok", "Twilio number is linked to the agent.",
+          "bad", "ELEVENLABS_AGENT_PHONE_NUMBER_ID is empty. Link the Twilio number to the ElevenLabs agent (Phone numbers → import Twilio), copy its phone number ID into backend/.env, then restart the backend. Calls fail with missing_elevenlabs_phone_number_id until then."],
+  out:   ["Outbound", s=>s.outbound_calls_enabled, "ok", "Real outbound calls are enabled. Every Call is billable.",
+          "warn", "ELEVENLABS_ALLOW_OUTBOUND_CALLS is false, so real calls are blocked on purpose (outbound_calls_disabled). Preview still works. Set it to true only when you're ready to dial."],
+  vars:  ["Variables", s=>missingVars(s).length===0, "ok", s=>`All ${s.agent.prompt_variables.length} prompt variables are sent by the backend.`,
+          "bad", s=>`Prompt uses ${missingVars(s).map(v=>"{{"+v+"}}").join(", ")} but the backend doesn't send it. The agent would say an empty value.`]
+};
+function missingVars(s){ return s.agent.prompt_variables.filter(v=>!s.backend_variables.includes(v)); }
+const ICON = {ok:"✓", warn:"◐", bad:"✕"};
+let openWhy = null;
+
+function renderHealth(){
+  const s = STATUS, bar = document.getElementById("health");
+  bar.querySelectorAll(".chip,.mode,.base").forEach(e=>e.remove());
+  Object.entries(REASONS).filter(([k])=>MODE==="live"||k!=="net").filter(([k])=>!(s.unreachable&&k!=="net")).filter(([k])=>!(k==="vars"&&s.agentErr))
+    .sort(([a],[b])=>(b==="net")-(a==="net")).forEach(([k,r])=>{
+    const good = r[1](s), cls = good ? r[2] : r[4];
+    const label = k==="vars" ? `${r[0]} ${s.agent.prompt_variables.length-missingVars(s).length}/${s.agent.prompt_variables.length}` : r[0];
+    const b = document.createElement("button");
+    b.className = "chip "+cls; b.textContent = `${ICON[cls]} ${label}`;
+    b.setAttribute("aria-expanded", openWhy===k);
+    b.onclick = ()=>{ openWhy = openWhy===k ? null : k; showWhy(); renderHealth(); };
+    bar.appendChild(b);
+  });
+  if(MODE==="live"){ const u=document.createElement("input"); u.className="base"; u.value=BASE; u.title="backend base URL";
+    u.style.cssText="width:210px;margin-left:auto;font-size:12px;padding:3px 8px";
+    u.onchange=()=>{ BASE=u.value.trim().replace(/\/+$/,""); try{localStorage.setItem("console_base",BASE);}catch{} refreshLive(); };
+    bar.appendChild(u); }
+  const m = document.createElement("button"); m.className="mode chip"; m.style.marginLeft = MODE==="live"?"0":"auto";
+  m.style.background = MODE==="live" ? "var(--green-bg)" : "var(--amber-bg)"; m.style.color = MODE==="live" ? "var(--green)" : "var(--amber)";
+  m.textContent = MODE==="live" ? "● LIVE · switch to mock" : "● MOCK · switch to live";
+  m.onclick = ()=>setMode(MODE==="live"?"mock":"live"); bar.appendChild(m);
+}
+function showWhy(){
+  const box = document.getElementById("why");
+  if(!openWhy){ box.style.display="none"; return; }
+  const r = REASONS[openWhy], s = STATUS, good = r[1](s);
+  const cls = good ? r[2] : r[4], txt = good ? r[3] : r[5];
+  box.className = "why "+cls; box.style.display="block";
+  box.innerHTML = `<b>${r[0]}</b> · ${typeof txt==="function"?txt(s):txt}`;
+}
+
+// ---------- Queue ----------
+let sel = 0, manual = null;
+const TAGS = { no_answer:["no answer","bad"], price_mismatch:["higher","warn"], verified:["verified","ok"],
+               unconfirmed:["unconfirmed","warn"], calling:["in call","acc"], next:["next","ok"], noph:["no phone","mut"] };
+
+function nextIndex(from){
+  for(let i=0;i<hotels.length;i++){ const j=(from+i)%hotels.length, h=hotels[j];
+    if(h.call_ready && !h.outcome) return j; }
+  return -1;
+}
+function renderQueue(){
+  const nx = nextIndex(0);
+  document.getElementById("queue").innerHTML = hotels.map((h,i)=>{
+    let t = h.status==="calling" ? "calling" : h.outcome ? h.outcome : !h.call_ready ? "noph" : i===nx ? "next" : "";
+    const tag = t ? `<span class="tag ${TAGS[t][1]}" title="${h.reason||""}">${TAGS[t][0]}</span>` : "<span></span>";
+    return `<div class="row${i===sel&&!manual?" sel":""}" data-i="${i}" role="button" tabindex="0">
+      <span class="n">${String(i+1).padStart(2,"0")}</span>
+      <span style="min-width:0"><span class="nm">${esc(h.name)}</span> <span class="pr">$${h.online}</span>
+      <div class="sub">${esc(h.unit)} · ${esc(h.platform)} · tax ${h.tax}</div></span>${tag}</div>`;
+  }).join("");
+  document.querySelectorAll("#queue .row").forEach(r=>{
+    const go=()=>{ sel=+r.dataset.i; manual=null; disarm(); renderQueue(); };
+    r.onclick=go; r.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();go();} };
+  });
+  const t = target();
+  document.getElementById("callBtn").textContent = armed ? `Confirm call · ${t.name}` : `Call ${t.name}`;
+  const n = hotels[nx]; document.getElementById("sNext").textContent = n ? n.name : "queue empty";
+}
+function target(){ return manual || hotels[sel]; }
+
+// ---------- Preview payload (mirrors backend build_call_payload) ----------
+function payloadFor(h){
+  const s = manual ? {check_in:manual.check_in, check_out:manual.check_out, guests:manual.guests} : STAY;
+  const nights = Math.round((new Date(s.check_out)-new Date(s.check_in))/864e5);
+  return { agent_id:"<ELEVENLABS_AGENT_ID>", agent_phone_number_id: STATUS.phone_number_id_configured?"<set>":null,
+    to_number: h.phone, conversation_initiation_client_data:{ dynamic_variables:{
+      hotel_name:h.name, hotel_phone:h.phone, check_in:s.check_in, check_out:s.check_out, nights, guests:s.guests }},
+    call_recording_enabled:false };
+}
+
+// ---------- Simulated call ----------
+let armed=false, armTimer=null, running=false, clock=null, t0=0, transcript=[], last=null;
+function disarm(){ armed=false; clearTimeout(armTimer); const b=document.getElementById("callBtn"); b.classList.remove("armed"); b.classList.add("danger"); }
+function onCall(){
+  const h = target();
+  if(running) return toast("a call is already running");
+  if(!h.phone) return toast(`${h.name}: no phone number`);
+  if(!armed){ armed=true; const b=document.getElementById("callBtn"); b.classList.remove("danger"); b.classList.add("armed");
+    renderQueue(); armTimer=setTimeout(()=>{disarm();renderQueue();},4000); return; }
+  disarm(); if(MODE==="live") liveCall(h); else startCall(h);
+}
+function setStep(i, fail){
+  document.querySelectorAll("#steps span").forEach((s,k)=>{
+    s.className = k<i ? "done" : k===i ? (fail?"fail":(i===3?"fin":"on")) : "";
+  });
+}
+function startCall(h){
+  running=true; transcript=[]; h.status="calling"; renderQueue();
+  document.getElementById("cName").textContent = h.name.toUpperCase();
+  document.getElementById("cPhone").textContent = h.phone;
+  const log=document.getElementById("log"); log.innerHTML="";
+  ["sTotal","sDiff","sAvail","sTime"].forEach(id=>{const e=document.getElementById(id); e.textContent="—"; e.style.color="";});
+  setStep(0); t0=Date.now(); clearInterval(clock);
+  clock=setInterval(()=>{document.getElementById("timer").textContent=fmt((Date.now()-t0)/1000);},250);
+  sysLine("dialing "+h.phone+" …");
+  const sc = SCRIPTS[h.id] || SCRIPTS.default;
+  if(sc.fail){ setTimeout(()=>{ sysLine("no answer after 25s ring budget"); finish(h, sc, sc.fail); },2200); return; }
+  setTimeout(()=>{ setStep(1); sysLine("connected · waiting for reception to speak");
+    const speed=0.35;
+    sc.lines.forEach(([who,sec,text])=>setTimeout(()=>addLine(who,sec,text), 600+sec*1000*speed));
+    const end = 600+sc.lines[sc.lines.length-1][1]*1000*speed+700;
+    setTimeout(()=>{ setStep(2); sysLine("processing transcript …"); setTimeout(()=>finish(h, sc), 1200); }, end);
+  },1500);
+}
+function addLine(who,sec,text){
+  transcript.push({role:who, t:sec, text});
+  const log=document.getElementById("log"), d=document.createElement("div");
+  if(who==="sys"){ d.className="msg sys"; d.textContent="· "+text+" ·"; }
+  else { d.className="msg "+who;
+    d.innerHTML=`<span class="w">${who==="hotel"?"reception":"agent"} · ${sec}s</span>${hl(esc(text))}`; }
+  log.appendChild(d); log.scrollTop=log.scrollHeight;
+}
+function sysLine(t){ const log=document.getElementById("log"), d=document.createElement("div"); d.className="msg sys"; d.textContent="> "+t; log.appendChild(d); log.scrollTop=log.scrollHeight; }
+function finish(h, sc, failOutcome){
+  clearInterval(clock); running=false; h.status="";
+  const dur=(Date.now()-t0)/1000; let outcome;
+  if(failOutcome){ outcome=failOutcome; setStep(3,true); }
+  else if(sc.total==null){ outcome="unconfirmed"; setStep(3,true); }
+  else { outcome = sc.total<=h.online ? "verified" : "price_mismatch"; setStep(3); }
+  if(!manual) h.outcome=outcome;
+  const diff = sc.total!=null ? sc.total-h.online : null;
+  setStat("sTotal", sc.total!=null?"$"+sc.total:"—");
+  setStat("sDiff", diff==null?"—":(diff>0?"+$"+diff:"−$"+Math.abs(diff)), diff==null?"":diff>0?"var(--amber)":"var(--green)");
+  setStat("sAvail", sc.avail==null?"unknown":sc.avail?"yes":"no", sc.avail?"var(--green)":"var(--amber)");
+  setStat("sTime", fmt(dur));
+  sysLine(`outcome: ${outcome}${outcome==="price_mismatch"?" · phone total above online, move to next":""}`);
+  last={hotel:h, outcome, total:sc.total, diff, dur, transcript:[...transcript], at:new Date(), usage:null, source:"mock"};
+  showUsage(null, true);
+  addHist(last); renderQueue();
+  const n=nextIndex(0); if(n>=0 && !manual && outcome!=="verified"){ sel=n; renderQueue(); }
+}
+function setStat(id,v,c){ const e=document.getElementById(id); e.textContent=v; e.style.color=c||""; }
+
+// ---------- History / export / email ----------
+const history=[];
+function addHist(r){
+  history.unshift(r);
+  document.getElementById("hist").innerHTML = history.map(x=>{
+    const [lbl,cls]=TAGS[x.outcome]||[x.outcome,"mut"];
+    return `<tr><td>${x.at.toLocaleTimeString()}</td><td>${esc(x.hotel.name)}</td><td><span class="tag ${cls}">${lbl}</span></td>
+      <td>${x.total!=null?"$"+x.total:"—"}</td><td>${x.hotel.online==="?"?"—":"$"+x.hotel.online}</td><td>${fmt(x.dur)}</td>
+      <td>${x.usage&&x.usage.llm_total_tokens!=null?x.usage.llm_total_tokens.toLocaleString():x.source==="mock"?"mock":"—"}</td>
+      <td>${x.usage&&x.usage.cost_usd!=null?"$"+x.usage.cost_usd.toFixed(4):x.source==="mock"?"mock":"—"}</td></tr>`;
+  }).join("");
+  const real=history.filter(x=>x.usage);
+  const tok=real.reduce((a,x)=>a+(x.usage.llm_total_tokens||0),0), cost=real.reduce((a,x)=>a+(x.usage.cost_usd||0),0);
+  document.getElementById("sessTot").textContent = real.length ? `real calls: ${real.length} · ${tok.toLocaleString()} tokens · $${cost.toFixed(4)}` : "";
+}
+function transcriptText(r){ return r.transcript.filter(l=>l.role!=="sys").map(l=>`[${l.t}s] ${l.role==="hotel"?"Reception":"Agent"}: ${l.text}`).join("\n"); }
+function openDrawer(title, body){ document.getElementById("dTitle").textContent=title; document.getElementById("dBody").textContent=body; document.getElementById("drawer").style.display="block"; }
+
+document.getElementById("emailBtn").onclick=()=>{
+  if(!last||last.outcome!=="verified") return openDrawer("EMAIL PREVIEW","No verified quote yet. The email is only built from a verified call.");
+  const h=last.hotel;
+  openDrawer("EMAIL PREVIEW · not sent", `To: <organizer email TBA>
+Subject: Team # 20 - Hotel Reservation Confirmed!
+
+Hotel Name: ${h.name}
+Hotel Address: ${h.address||"<from search result>"}
+Hotel Phone: ${h.phone}
+Reservation #: ${last.reservation||"N/A (not provided without a booking)"}
+Reservation Date: ${STAY.check_in} to ${STAY.check_out} (${STAY.guests} guest)
+Price for the stay: $${last.total} CAD total, incl. tax
+Link To Audio Recording of the conversation: ${last.audio_url||"<ElevenLabs recording link: recording must be enabled>"}`);
+};
+document.getElementById("copyBtn").onclick=async()=>{
+  if(!last) return toast("no transcript yet");
+  try{ await navigator.clipboard.writeText(transcriptText(last)); toast("transcript copied"); }
+  catch{ openDrawer("TRANSCRIPT", transcriptText(last)); }
+};
+document.getElementById("exportBtn").onclick=()=>{
+  if(!history.length) return toast("no calls to export");
+  const md = "| # | Time | Property | Online | Phone total | Outcome | Duration | Tokens | Cost (USD) | Source |\n|---|---|---|---|---|---|---|---|---|---|\n" +
+    history.slice().reverse().map((x,i)=>`| ${i+1} | ${x.at.toLocaleTimeString()} | ${x.hotel.name} | ${x.hotel.online==="?"?"?":"$"+x.hotel.online} | ${x.total!=null?"$"+x.total:"?"} | ${x.outcome} | ${fmt(x.dur)} | ${x.usage&&x.usage.llm_total_tokens!=null?x.usage.llm_total_tokens:"?"} | ${x.usage&&x.usage.cost_usd!=null?x.usage.cost_usd:"?"} | ${x.source} |`).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([md],{type:"text/markdown"}));
+  a.download="test-log-export.md"; a.click(); toast("exported test-log-export.md");
+};
+
+// ---------- Load hotels.json (search module output) ----------
+document.getElementById("loadBtn").onclick=()=>document.getElementById("file").click();
+document.getElementById("file").onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const j=JSON.parse(await f.text());
+    if(!Array.isArray(j.hotels)) throw new Error("no hotels[] array");
+    const byId=Object.fromEntries(j.hotels.map(h=>[h.candidate_id,h]));
+    const order=[...(j.shortlist||[]),...(j.enquiry_shortlist||[])].filter((v,i,a)=>a.indexOf(v)===i);
+    const rest=j.hotels.map(h=>h.candidate_id).filter(id=>!order.includes(id));
+    hotels=[...order,...rest].map(id=>byId[id]).filter(Boolean).map(h=>({
+      id:h.candidate_id, name:h.property_name||"(unnamed)", type:h.property_type||"", unit:h.property_type||"stay",
+      phone:h.phone||null, online:h.online_quote&&h.online_quote.amount!=null?Math.round(h.online_quote.amount):"?",
+      tax:(h.online_quote&&h.online_quote.tax_fee_status)||"unknown",
+      platform:(h.platforms&&h.platforms[0])||(h.online_quote&&h.online_quote.provider)||"?",
+      call_ready:!!h.call_ready, reason:(h.not_call_ready_reasons||[]).join(", "), status:"", outcome:null }));
+    if(j.request){ STAY.check_in=j.request.check_in||STAY.check_in; STAY.check_out=j.request.check_out||STAY.check_out; STAY.guests=j.request.guests||STAY.guests; }
+    sel=Math.max(0,nextIndex(0)); manual=null;
+    document.getElementById("qsrc").textContent=`${f.name} · ${hotels.length} candidates`;
+    renderQueue(); toast("loaded "+hotels.length+" candidates (calls still simulated)");
+  }catch(err){ toast("couldn't read file: "+err.message); }
+};
+
+// ---------- Token and cost (real data from /api/elevenlabs/conversations/{id}) ----------
+// Mirrors backend summarize_usage() so a raw ElevenLabs conversation JSON also works.
+function summarizeUsage(d){
+  const md = d && typeof d.metadata==="object" && d.metadata ? d.metadata : {};
+  const ch = md.charging && typeof md.charging==="object" ? md.charging : {};
+  const usd = v => typeof v==="number" && isFinite(v) && v>=0 ? v : null;
+  const tok = c => c && Number.isInteger(c.tokens) && c.tokens>=0 ? c.tokens : null;
+  const MAP = {input:"input", input_cache_read:"input_cache_read", input_cache_write:"input_cache_write", output_total:"output"};
+  const by = {};
+  (Array.isArray(d.transcript)?d.transcript:[]).forEach(t=>{
+    const m = t && t.llm_usage && t.llm_usage.model_usage;
+    if(!m || typeof m!=="object" || Array.isArray(m)) return;
+    Object.entries(m).forEach(([model,c])=>{ if(!c||typeof c!=="object") return;
+      Object.entries(MAP).forEach(([src,dst])=>{ const n=tok(c[src]); if(n==null) return;
+        by[model] = by[model] || {input:0,input_cache_read:0,input_cache_write:0,output:0}; by[model][dst]+=n; }); });
+  });
+  const has = Object.keys(by).length>0, vals=Object.values(by);
+  const inp = vals.reduce((a,m)=>a+m.input+m.input_cache_read+m.input_cache_write,0), out = vals.reduce((a,m)=>a+m.output,0);
+  return { cost_usd:usd(md.cost_fiat), llm_cost_usd:usd(ch.llm_price), platform_cost_usd:usd(ch.platform_price),
+    llm_input_tokens:has?inp:null, llm_output_tokens:has?out:null, llm_total_tokens:has?inp+out:null, tokens_by_model:by };
+}
+function showUsage(u, mock){
+  const T=document.getElementById("sTok"), TH=document.getElementById("sTokH"), C=document.getElementById("sCost"), CH=document.getElementById("sCostH");
+  if(mock){ T.textContent="—"; TH.textContent="mock call · no data"; C.textContent="—"; CH.textContent="mock call · no data"; return; }
+  T.textContent = u&&u.llm_total_tokens!=null ? u.llm_total_tokens.toLocaleString() : "unknown";
+  TH.textContent = u&&u.llm_total_tokens!=null ? `${u.llm_input_tokens.toLocaleString()} in / ${u.llm_output_tokens.toLocaleString()} out` : "not in response yet";
+  C.textContent = u&&u.cost_usd!=null ? "$"+u.cost_usd.toFixed(4) : "pending";
+  CH.textContent = u&&(u.llm_cost_usd!=null||u.platform_cost_usd!=null)
+    ? `llm ${u.llm_cost_usd!=null?"$"+u.llm_cost_usd.toFixed(4):"?"} · platform ${u.platform_cost_usd!=null?"$"+u.platform_cost_usd.toFixed(4):"?"}`
+    : "usually filled once status is done";
+}
+document.getElementById("tokCard").onclick=()=>{
+  if(!last||!last.usage) return openDrawer("LLM TOKENS", last&&last.source==="mock" ? "Mock call: no token data. Load a real conversation JSON to see tokens." : "No real call loaded yet.");
+  const by=last.usage.tokens_by_model||{}, rows=Object.entries(by);
+  openDrawer("LLM TOKENS · per model", rows.length
+    ? "model".padEnd(28)+"input".padStart(9)+"cache rd".padStart(10)+"cache wr".padStart(10)+"output".padStart(9)+"\n"+
+      rows.map(([m,c])=>m.slice(0,27).padEnd(28)+String(c.input).padStart(9)+String(c.input_cache_read).padStart(10)+String(c.input_cache_write).padStart(10)+String(c.output).padStart(9)).join("\n")+
+      `\n\ntotal: ${last.usage.llm_total_tokens} tokens (${last.usage.llm_input_tokens} in / ${last.usage.llm_output_tokens} out)`
+    : "The response has no transcript[].llm_usage data, so tokens are unknown (not zero).");
+};
+
+const STEP_OF = {initiated:0, "in-progress":1, processing:2, done:3, failed:3};
+function loadConversation(j, label){
+  if(!j || !Array.isArray(j.transcript)) throw new Error("no transcript[] array; expected the /conversations/{id} response");
+  const id = j.conversation_id || "unknown";
+  const usage = j.usage || summarizeUsage(j);
+  const dur = j.call_duration_secs ?? (j.metadata && j.metadata.call_duration_secs) ?? null;
+  const st = j.status || "unknown";
+  clearInterval(clock); running=false;
+  document.getElementById("cName").textContent = "REAL CALL";
+  document.getElementById("cPhone").textContent = id;
+  document.getElementById("timer").textContent = dur!=null ? fmt(dur) : "--:--";
+  setStep(STEP_OF[st] ?? 0, st==="failed");
+  const log=document.getElementById("log"); log.innerHTML=""; transcript=[];
+  sysLine(`loaded ${label} · status ${st}`);
+  j.transcript.filter(t=>t && t.message!=null).forEach(t=>addLine(t.role==="agent"?"agent":"hotel", Math.round((t.time_in_call_secs||0)*10)/10, String(t.message)));
+  if(j.transcript_summary || (j.analysis && j.analysis.transcript_summary)) sysLine("summary: "+(j.transcript_summary || j.analysis.transcript_summary));
+  ["sTotal","sDiff","sAvail"].forEach(i=>setStat(i,"—"));
+  setStat("sTime", dur!=null?fmt(dur):"—");
+  showUsage(usage, false);
+  last={hotel:{name:"conv "+String(id).slice(-8), online:"?", phone:"?"}, outcome:st, total:null, diff:null, dur:dur||0,
+        transcript:[...transcript], at:new Date(), usage, source:"real"};
+  addHist(last);
+  toast(`real call loaded · ${usage.llm_total_tokens!=null?usage.llm_total_tokens+" tokens":"tokens unknown"} · ${usage.cost_usd!=null?"$"+usage.cost_usd.toFixed(4):"cost pending"}`);
+}
+document.getElementById("convBtn").onclick=()=>document.getElementById("convFile").click();
+document.getElementById("convFile").onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return; e.target.value="";
+  try{ loadConversation(JSON.parse(await f.text()), f.name); }
+  catch(err){ toast("couldn't read conversation: "+err.message); }
+};
+TAGS.done=["done","ok"]; TAGS.failed=["failed","bad"]; TAGS["in-progress"]=["in progress","acc"];
+TAGS.processing=["processing","acc"]; TAGS.initiated=["initiated","acc"]; TAGS.unknown=["unknown","mut"];
+
+
+// ---------- LIVE mode: Connor's backend /api/elevenlabs/* ----------
+function defaultBase(){
+  try{ const v=localStorage.getItem("console_base"); if(v) return v; }catch{}
+  return location.protocol.startsWith("http") ? location.origin : "http://127.0.0.1:8000";
+}
+REASONS.net = ["Backend", s=>!s.unreachable, "ok", ()=>`Connected to ${BASE}.`,
+  "bad", ()=>`Can't reach ${BASE}. Start the backend (python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000) and check the URL in the box. If it is running, the browser is probably blocking this page (CORS): open the console from the backend's own address, or have the backend allow this page's origin.`];
+const BACKEND_VARS=["hotel_name","hotel_address","hotel_phone","check_in","check_out","nights","guests","online_price","currency","price_basis","taxes_included","source_url","source_checked_at"];
+async function api(path, opts={}){
+  let r;
+  try{ r = await fetch(BASE+"/api/elevenlabs"+path, {headers:{"Content-Type":"application/json"}, ...opts}); }
+  catch{ const e=new Error("backend not reachable"); e.code="unreachable"; throw e; }
+  let body=null; try{ body=await r.json(); }catch{}
+  if(!r.ok){
+    const d=body&&body.detail;
+    const msg=(d&&d.message)||(Array.isArray(d)?d.map(x=>(x.loc||[]).join(".")+": "+x.msg).join("; "):"HTTP "+r.status);
+    const e=new Error(msg); e.code=(d&&d.code)||("http_"+r.status); throw e;
+  }
+  return body;
+}
+async function refreshLive(){
+  if(MODE!=="live") return;
+  try{
+    const st=await api("/status");
+    let agent={name:"?",language:"?",first_message:"",prompt_variables:[]}, agentErr=null;
+    try{ agent=await api("/agent"); }catch(e){ agentErr=e; }
+    STATUS={...st, agent_id_configured: st.agent_id_configured && !agentErr, agent, agentErr, backend_variables:BACKEND_VARS, unreachable:false};
+  }catch(e){ STATUS={...MOCK_STATUS, unreachable:true}; openWhy=openWhy||"net"; }
+  renderHealth(); showWhy();
+}
+let liveTimer=null;
+function setMode(m){
+  if(running) return toast("finish the current call first");
+  MODE=m; try{ localStorage.setItem("console_mode",m); }catch{}
+  clearInterval(liveTimer); openWhy=null;
+  if(m==="live"){ STATUS={...MOCK_STATUS, unreachable:true}; refreshLive(); liveTimer=setInterval(refreshLive,10000); }
+  else STATUS=MOCK_STATUS;
+  renderHealth(); showWhy();
+  document.getElementById("foot").textContent = m==="live"
+    ? `LIVE MODE · ${BASE}/api/elevenlabs · Call places a REAL, billable phone call (only if the backend allows outbound calls). Preview never dials.`
+    : "MOCK MODE · calls, transcripts and backend status are simulated. Nothing is dialed.";
+}
+function e164(p){
+  if(!p) return null; const raw=String(p).trim(), d=raw.replace(/\D/g,"");
+  if(raw.startsWith("+")) return /^[1-9]\d{7,14}$/.test(d) ? "+"+d : null;
+  if(d.length===10) return "+1"+d; if(d.length===11&&d[0]==="1") return "+"+d; return null;
+}
+function hotelRequest(h, confirm){
+  const s = manual ? {check_in:manual.check_in, check_out:manual.check_out, guests:manual.guests} : STAY;
+  const req={hotel_name:h.name, phone_number:e164(h.phone), check_in:s.check_in, check_out:s.check_out, guests:+s.guests||1, confirm_call:!!confirm};
+  if(h.address) req.address=h.address;
+  if(typeof h.online==="number"){ req.online_price=h.online; req.currency="CAD"; req.price_basis="total_stay";
+    if(h.tax==="included") req.taxes_included=true; else if(h.tax==="excluded") req.taxes_included=false; }
+  return req;
+}
+const HINTS={unreachable:"Backend not reachable, or blocked by the browser (CORS).",
+  outbound_calls_disabled:"Real calls are switched off on the backend (ELEVENLABS_ALLOW_OUTBOUND_CALLS=false). Nothing was dialed.",
+  call_confirmation_required:"The request didn't confirm the call. Nothing was dialed.",
+  missing_elevenlabs_phone_number_id:"No ElevenLabs phone number ID on the backend. Nothing was dialed.",
+  elevenlabs_call_rejected:"ElevenLabs rejected the call request.",
+  invalid_elevenlabs_response:"Unexpected reply from ElevenLabs. The call MAY already be placed: check the ElevenLabs dashboard before retrying."};
+function explain(e){ return `${e.code||"error"}: ${e.message}` + (HINTS[e.code] ? `\n\n${HINTS[e.code]}` : ""); }
+async function livePreview(h){
+  const req=hotelRequest(h,false);
+  if(!req.phone_number) return toast(`not a valid phone number: ${h.phone||"none"}`);
+  try{ openDrawer("PREVIEW · no call placed", JSON.stringify(await api("/calls/preview",{method:"POST",body:JSON.stringify(req)}),null,2)); }
+  catch(e){ openDrawer("PREVIEW FAILED", explain(e)); }
+}
+function resetCallView(h, sub){
+  document.getElementById("cName").textContent=h.name.toUpperCase();
+  document.getElementById("cPhone").textContent=sub||h.phone||"";
+  document.getElementById("log").innerHTML=""; transcript=[];
+  ["sTotal","sDiff","sAvail","sTime"].forEach(i=>setStat(i,"—")); showUsage(null,false);
+  setStep(0); t0=Date.now(); clearInterval(clock);
+  clock=setInterval(()=>{document.getElementById("timer").textContent=fmt((Date.now()-t0)/1000);},250);
+}
+let pollT=null;
+async function liveCall(h){
+  const req=hotelRequest(h,true);
+  if(!req.phone_number) return toast(`not a valid phone number: ${h.phone||"none"}`);
+  running=true; h.status="calling"; renderQueue(); resetCallView(h, req.phone_number);
+  sysLine("POST /calls → "+req.phone_number);
+  let res;
+  try{ res=await api("/calls",{method:"POST",body:JSON.stringify(req)}); }
+  catch(e){ running=false; h.status=""; clearInterval(clock); setStep(0,true); explain(e).split("\n").filter(Boolean).forEach(sysLine); renderQueue(); return; }
+  const id=res.conversation_id; let shown=0, after=0;
+  sysLine("call accepted · conversation "+id);
+  document.getElementById("cPhone").textContent=req.phone_number+" · "+id;
+  const tick=async()=>{
+    let c;
+    try{ c=await api("/conversations/"+encodeURIComponent(id)); }
+    catch(e){ sysLine("poll: "+e.code); pollT=setTimeout(tick,3000); return; }
+    setStep(STEP_OF[c.status] ?? 1, c.status==="failed");
+    const lines=(c.transcript||[]).filter(t=>t.message!=null);
+    lines.slice(shown).forEach(t=>addLine(t.role==="agent"?"agent":"hotel", Math.round((t.time_in_call_secs||0)*10)/10, t.message));
+    shown=lines.length;
+    if(c.usage) showUsage(c.usage,false);
+    if(c.finished){
+      clearInterval(clock); if(c.call_duration_secs!=null) document.getElementById("timer").textContent=fmt(c.call_duration_secs);
+      const costReady = !c.usage || c.usage.cost_usd!=null;
+      if(!costReady && after++<5){ pollT=setTimeout(tick,3000); return; }
+      running=false; h.status="";
+      if(!manual) h.outcome = c.status==="done" ? "done" : "failed";
+      setStat("sTime", c.call_duration_secs!=null?fmt(c.call_duration_secs):"—");
+      if(c.transcript_summary) sysLine("summary: "+c.transcript_summary);
+      if(c.data_collection_results && Object.keys(c.data_collection_results).length) sysLine("extracted: "+JSON.stringify(c.data_collection_results));
+      sysLine("status: "+c.status+(c.call_successful?" · "+c.call_successful:""));
+      last={hotel:h, outcome:c.status, total:null, diff:null, dur:c.call_duration_secs||0, transcript:[...transcript],
+            at:new Date(), usage:c.usage||null, source:"real", conversation_id:id};
+      addHist(last); renderQueue();
+      return;
+    }
+    pollT=setTimeout(tick,2000);
+  };
+  tick();
+}
+
+// ---------- Manual ----------
+document.getElementById("manualToggle").onclick=()=>{ const m=document.getElementById("manual"); m.style.display=m.style.display==="grid"?"none":"grid"; };
+document.getElementById("mUse").onclick=()=>{
+  manual={ id:"manual", name:val("mName"), phone:val("mPhone"), online:"?", unit:"manual", platform:"manual", tax:"unknown",
+           check_in:val("mIn"), check_out:val("mOut"), guests:+val("mGuests")||1, call_ready:true };
+  disarm(); renderQueue(); toast("manual target set: "+manual.name);
+};
+document.getElementById("previewBtn").onclick=()=>{
+  if(MODE==="live") return livePreview(target());
+  const h=target(); const missing=[];
+  if(!MOCK_STATUS.phone_number_id_configured) missing.push("ELEVENLABS_AGENT_PHONE_NUMBER_ID");
+  openDrawer("PREVIEW · no call placed", JSON.stringify({ready_to_call: !missing.length && MOCK_STATUS.outbound_calls_enabled,
+    outbound_calls_enabled: MOCK_STATUS.outbound_calls_enabled, missing_configuration: missing, payload: payloadFor(h)}, null, 2));
+};
+document.getElementById("callBtn").onclick=onCall;
+document.getElementById("dClose").onclick=()=>document.getElementById("drawer").style.display="none";
+
+// ---------- utils ----------
+function val(id){ return document.getElementById(id).value.trim(); }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function hl(s){ return s.replace(/(\$\s?\d[\d,.]*(\s?(a night|per night|total|plus tax|for the two nights))?)/gi,"<mark>$1</mark>"); }
+function fmt(s){ s=Math.max(0,Math.round(s)); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+let toastT; function toast(m){ const t=document.getElementById("toast"); t.textContent="> "+m; clearTimeout(toastT); toastT=setTimeout(()=>t.textContent="",3500); }
+
+STATUS=MOCK_STATUS; renderQueue();
+let savedMode=null; try{ savedMode=localStorage.getItem("console_mode"); }catch{}
+setMode(savedMode==="live" ? "live" : "mock");
+</script>
+</body>
+</html>
