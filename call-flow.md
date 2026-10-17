@@ -1,4 +1,4 @@
-# Hotel Call Flow — Team SprintMasters (v0.3.4)
+# Hotel Call Flow — Team SprintMasters (v0.3.5)
 
 > How our agent phones a property and turns the call into a valid submission. Owner: Design.
 > Baseline: `agent-spec.md` (team repo, current version). v0.1 was reviewed against the repair brief (F01–F18); see §13.
@@ -6,6 +6,8 @@
 > **The call is an enquiry, not a booking.** We confirm availability and a price, optionally ask for a reference, and email the proof. We **never book, never hold a room, never pay**.
 >
 > **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.6 (v0.3.2: API variables aligned; no caller name required; clarification limit still counts per field).
+>
+> **v0.3.5:** merged local review items: incomplete quotes return to the orchestrator (`quote_incomplete`) instead of being dropped; opening asks for tax and required fees; softer "check our website" reply; no invented arrival time. Prompt: `call-agent-prompt.md` v0.7.3.
 >
 > **v0.3.4:** hang up as soon as the price is known; no reservation # question; never ask for any name (prompt v0.7.2).
 >
@@ -86,7 +88,7 @@ flowchart TD
     style EIStop fill:#ffcdd2,stroke:#c62828
 ```
 
-Decision details: `Preflight OK?` = prompt parsed (city, dates, guests) and email config present; `More candidates and time left?` = untried candidate AND run budget left; `Quote verified?` = availability and final quote verified (§1); `Data and transcript ready?` = `submission_ready` (§1).
+Decision details: `Preflight OK?` = prompt parsed (city, dates, guests) and email config present; `More candidates and time left?` = untried candidate AND run budget left; `Quote verified?` = availability and final quote verified (§1); a `quote_incomplete` result is judged here by §7 (e.g. pre-tax vs pre-tax if allowed): comparable → Yes, otherwise No; `Data and transcript ready?` = `submission_ready` (§1).
 
 **Every loop is bounded** (F04, F05):
 - `More`: each candidate is tried at most `retry_same_number + 1` times and is marked as tried. `candidate_limit` and the run budget cap the queue.
@@ -122,9 +124,10 @@ flowchart TD
     Avail -->|"No or only partly"| Fail4["outcome: unavailable"]
     Avail -->|"Unclear after clarification limit"| Fail5["outcome: unconfirmed"]
     Avail -->|"Yes"| Gap{"Price clear and complete?"}
-    Gap -->|"Missing item, clarifications left"| AskGap["Ask only the missing item: amount, per night or total, everyone, fees, currency, cheaper option"]
+    Gap -->|"Missing item, tries left on that item"| AskGap["Ask only the missing part, combined in one question"]
     AskGap --> Gap
-    Gap -->|"Still unclear, limit reached"| Fail5
+    Gap -->|"Same item failed twice, or no full total given"| Partial["outcome: quote_incomplete, keep raw words and missing fields"]
+    Partial --> Close
     Gap -->|"Yes"| Close["End the call immediately: no more questions, no goodbye"]
     Close --> Ret(["Hang up, return structured result to orchestrator"])
     Fail1 --> Ret
@@ -162,14 +165,14 @@ Hotel name, destination phone and dates come from the calling API; guests defaul
 
 | Moment | English | Français |
 |---|---|---|
-| Opening (after their greeting) | "Hi, I was wondering what your cheapest room is for {guests}, from {check_in} to {check_out}? And what would the total be with tax?" (hostel: "cheapest room or bed") | « Bonjour, je voulais savoir quelle est votre chambre la moins chère pour {guests}, du {check_in} au {check_out} ? Et ça ferait combien en tout, avec les taxes ? » |
-| Combined check (amount clear, coverage unclear) | "Is that 180 for both nights, with tax?" | « Donc 180 pour les deux nuits, taxes comprises ? » |
+| Opening (after their greeting) | "Hi, I was wondering what your cheapest room is for {guests}, from {check_in} to {check_out}? And what's the total for the whole stay, including tax and any required fees?" (hostel: "cheapest room or bed") | « Bonjour, je voulais savoir quelle est votre chambre la moins chère pour {guests}, du {check_in} au {check_out} ? Et ça ferait combien en tout pour le séjour, avec les taxes et les frais obligatoires ? » |
+| Combined check (amount clear, coverage unclear) | "Is that 180 for both nights, including tax and fees?" | « Donc 180 pour les deux nuits, taxes et frais compris ? » |
 | Misheard number | "Sorry, was that one fifteen or one fifty?" | « Pardon, c'était cent quinze ou cent cinquante ? » |
-| "Plus tax" | "What's that with tax?" | « Et avec les taxes, ça fait combien ? » |
-| More than one guest only | "Is that for both of us?" | « C'est pour nous deux ? » |
+| "Plus tax" | "What's the total with tax and any fees?" | « Et avec les taxes et les frais, ça fait combien ? » |
+| More than one guest only (use the real number) | "Is that for both of us?" / "Is that for all three guests?" | « C'est pour nous deux ? » / « C'est pour les trois personnes ? » |
 | Several prices | "Which one's the cheapest?" | « C'est laquelle la moins chère ? » |
 | Not sure it's cheapest | "Is that your cheapest room?" (hostel: "anything cheaper, like a bed in a shared room?") | « C'est votre chambre la moins chère ? » |
-| "Check our website" | "I'm on the phone with you now. Could you just tell me the cheapest total?" | « Je suis au téléphone avec vous, là. Vous pouvez juste me dire le total le moins cher ? » |
+| "Check our website" | "Sure. Could you quickly confirm the total for those dates?" | « D'accord. Vous pourriez juste me confirmer le total pour ces dates ? » |
 | Card asked | "I'm just checking prices for now, so no card. Could you still tell me the total?" | « Je regarde seulement les prix pour l'instant, donc pas de carte. Vous pouvez quand même me dire le total ? » |
 | Offer to book / hold | "No thanks, I'm just checking prices for now." | « Non merci, je regarde seulement les prix pour l'instant. » |
 | Close (right after the price) | *(hang up, no goodbye)* | *(raccrocher, sans au revoir)* |
@@ -216,9 +219,9 @@ Hotel name, destination phone and dates come from the calling API; guests defaul
 | French / unknown language | Switch / one check | Continue, or `unsupported_language` |
 | Bad line | Ask only about the missed part; `clarification_limit` per field | `line_failure` / `unconfirmed` |
 | "Check our website" / "book online" | Ask once for the cheapest total on the phone | Still refused → `unconfirmed` → next |
-| "89 plus tax", can't say the total | Record the exact words (e.g. "89 + HST"); agent doesn't calculate | Orchestrator decides if comparable (§7) |
+| "89 plus tax", can't say the total | Keep the exact words (e.g. "89 + HST"); agent doesn't calculate; end the call | `quote_incomplete` → orchestrator decides if comparable (§7) |
 | Closed / not taking guests | Apologise, end the call | `unavailable` → next |
-| Questions back (membership, bed type, arrival time) | "No" / "Whatever's cheapest" / "Not sure yet" | Continue |
+| Questions back (membership, bed type, arrival time) | "No" / "Whatever's cheapest" / "I'm not sure yet." Never invent details | Continue |
 
 ---
 
@@ -279,7 +282,7 @@ One process may play several roles. This split is about responsibility, not depl
 
 | Layer | Values |
 |---|---|
-| Business | `verified` · `unavailable` · `price_mismatch` · `unconfirmed` |
+| Business | `verified` · `quote_incomplete` · `unavailable` · `price_mismatch` · `unconfirmed` |
 | Call failure | `no_answer` · `voicemail` · `ivr_failed` · `hold_timeout` · `call_timeout` · `line_failure` · `payment_required` · `info_required` · `unsupported_language` · `wrong_property` · `provider_error` |
 | Evidence | `pending` · `complete` · `incomplete` · `retrieval_failed` |
 | Submission | `not_ready` · `ready` · `sending` · `accepted` · `failed` · `unknown` |
