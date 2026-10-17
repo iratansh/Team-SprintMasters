@@ -1,4 +1,4 @@
-# Hotel Call Flow — Team SprintMasters (v0.3.3)
+# Hotel Call Flow — Team SprintMasters (v0.3.4)
 
 > How our agent phones a property and turns the call into a valid submission. Owner: Design.
 > Baseline: `agent-spec.md` (team repo, current version). v0.1 was reviewed against the repair brief (F01–F18); see §13.
@@ -6,6 +6,8 @@
 > **The call is an enquiry, not a booking.** We confirm availability and a price, optionally ask for a reference, and email the proof. We **never book, never hold a room, never pay**.
 >
 > **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.6 (v0.3.2: API variables aligned; no caller name required; clarification limit still counts per field).
+>
+> **v0.3.4:** hang up as soon as the price is known; no reservation # question; never ask for any name (prompt v0.7.2).
 >
 > **v0.3.3:** the call only needs the price; after it, ask once for a reservation #, then hang up. Email proof is now the ElevenLabs **audio recording link** (see `agent-spec.md` §4).
 >
@@ -123,8 +125,7 @@ flowchart TD
     Gap -->|"Missing item, clarifications left"| AskGap["Ask only the missing item: amount, per night or total, everyone, fees, currency, cheaper option"]
     AskGap --> Gap
     Gap -->|"Still unclear, limit reached"| Fail5
-    Gap -->|"Yes"| Ref["Ask once for a reservation number: only if given right away, no waiting, then hang up"]
-    Ref --> Close["End the call immediately, no goodbye"]
+    Gap -->|"Yes"| Close["End the call immediately: no more questions, no goodbye"]
     Close --> Ret(["Hang up, return structured result to orchestrator"])
     Fail1 --> Ret
     Fail2 --> Ret
@@ -135,7 +136,7 @@ flowchart TD
 ```
 
 - Interruptions such as hold, transfer, card request, booking offer, language switch, bad line or disconnect can happen **at any step**. They are handled by the **global event rules in §5**, not by fixed boxes.
-- Every outcome box is a labelled result, not just a colour. The `Ref` question is always asked once; a "no" (or "you'd need to book") never blocks success.
+- Every outcome box is a labelled result, not just a colour. v0.3.4: no reservation # question; the call ends as soon as the price is known.
 
 ---
 
@@ -147,8 +148,8 @@ flowchart TD
 | 2 | Opening | **Reception speaks first.** Then one question: dates, guests, **cheapest available option** (bed, shared or private room) and **full-stay total incl. all taxes and fees** | Who answered, language | — |
 | 3 | Availability | Every night, for these guests | `availability_status` (confirmed / unavailable / unknown), option type (bed / shared / private) | — |
 | 4 | Fill gaps | Ask **only** what's unclear or missing (§7 table). Clear and complete → skip | `options[]` with `amount`, `currency`, `basis`, `tax_fee_status`, `conditions` | Nightly breakdown |
-| 5 | Reservation # | **Always ask once** right after the price, without booking or a card. Take it only if given right away; hold, "let me check", or needing details → hang up. Never ask for names | — | `enquiry_reference` + `reference_type` |
-| 6 | Close | End the call immediately after the reservation # question. No thanks, no goodbye | — | — |
+| 5 | ~~Reservation #~~ | Removed in v0.3.4: hang up right after the price | — | — |
+| 6 | Close | End the call immediately after the price. No questions, no thanks, no goodbye | — | — |
 | 7 | Compare | Orchestrator compares the cheapest confirmed option with the online price and other candidates | `comparison_status` | — |
 | 8 | Evidence | Fetch the **full transcript** of this call; extract and validate | `transcript`, all email fields | — |
 | 9 | Email | Send in the current template | `submission_status`, `provider_message_id` | — |
@@ -169,10 +170,9 @@ Hotel name, destination phone and dates come from the calling API; guests defaul
 | Several prices | "Which one's the cheapest?" | « C'est laquelle la moins chère ? » |
 | Not sure it's cheapest | "Is that your cheapest room?" (hostel: "anything cheaper, like a bed in a shared room?") | « C'est votre chambre la moins chère ? » |
 | "Check our website" | "I'm on the phone with you now. Could you just tell me the cheapest total?" | « Je suis au téléphone avec vous, là. Vous pouvez juste me dire le total le moins cher ? » |
-| Reference (optional) | "Is there a reference number for that quote?" | « Est-ce qu'il y a un numéro de référence pour ce prix ? » |
 | Card asked | "I'm just checking prices for now, so no card. Could you still tell me the total?" | « Je regarde seulement les prix pour l'instant, donc pas de carte. Vous pouvez quand même me dire le total ? » |
 | Offer to book / hold | "No thanks, I'm just checking prices for now." | « Non merci, je regarde seulement les prix pour l'instant. » |
-| Close (after price + reservation # question) | *(hang up, no goodbye)* | *(raccrocher, sans au revoir)* |
+| Close (right after the price) | *(hang up, no goodbye)* | *(raccrocher, sans au revoir)* |
 
 ---
 
@@ -374,12 +374,12 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 
 | ID | Path through the document | ✅ |
 |---|---|---|
-| T01 | Human EN → Avail yes → match → `Ref` → `Ret` → `Eval` yes → `Ready` → `Send` → `submitted`, one id | ✅ |
+| T01 | Human EN → Avail yes → price clear → `Close` → `Ret` → `Eval` yes → `Ready` → `Send` → `submitted`, one id | ✅ |
 | T02 | Staff quote $140, agent records it, no matching → `Ret` → Diagram 1 `Quote verified?` no (`price_mismatch`) → `Log` → next | ✅ |
 | T03 | v0.3: the agent no longer asks to match. If staff **volunteer** $100, that's the recorded quote → `Quote verified?` yes | ✅ (changed by design) |
 | T04 | §7 rule 7: the agent never says the online price, so a staff-stated number is the only quote | ✅ |
 | T05 | §6 volunteered "if you book now" price → record $85 + condition, no booking | ✅ |
-| T06 | `Ref` is optional; §1 lists no reference/name requirement | ✅ |
+| T06 | v0.3.4: no reference or name is ever asked; §1 needs neither | ✅ |
 | T07 | §5 booking offer: give up the reference, quote stands | ✅ |
 | T08 | §5 card request: decline → resume the first unconfirmed step | ✅ |
 | T09 | §5: payment needed to confirm → `payment_required` → no submit | ✅ |
