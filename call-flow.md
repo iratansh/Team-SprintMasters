@@ -1,9 +1,11 @@
-# Hotel Call Flow — Team SprintMasters (v0.2)
+# Hotel Call Flow — Team SprintMasters (v0.3)
 
 > How our agent phones a property and turns the call into a valid submission. Owner: Design.
 > Baseline: `agent-spec.md` (team repo, current version). v0.1 was reviewed against the repair brief (F01–F18); see §13.
 >
 > **The call is an enquiry, not a booking.** We confirm availability and a price, optionally ask for a reference, and email the proof. We **never book, never hold a room, never pay**.
+>
+> **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.4.
 >
 > **Status:** the document logic is fixed and has been walked through on paper (§14). **Nothing has been integration-tested yet:** telephony, DTMF, transcript retrieval and email sending are all still unverified (§12).
 
@@ -23,8 +25,8 @@ Three different things are easy to mix up, so they get separate names:
 quote_verified =
     availability_for_requested_stay == confirmed          (unknown ≠ confirmed)
     AND guest / stay requirements from the prompt are met
-    AND final quote was explicitly confirmed by staff     (us reading a number aloud ≠ confirmation)
-    AND comparison_status == comparable_match_or_lower
+    AND the quote was stated by staff                     (us reading a number aloud ≠ confirmation)
+    AND comparison_status == comparable_match_or_lower    (orchestrator, after the call)
     AND this flow did not create a booking or hold
 
 submission_ready =
@@ -94,7 +96,7 @@ Decision details: `Preflight OK?` = prompt parsed (city, dates, guests) and emai
 
 ## 3. Diagram 2: One call attempt (voice agent + telephony)
 
-Decision details: `Who` uses the ring budget; `EN or FR possible?` is a single check; `Whole stay available?` means every night for the prompt's guests; `Phone vs online total?` compares on the same basis (§7); `Final quote OK?` = staff-confirmed and match-or-lower.
+Decision details: `Who` uses the ring budget; `EN or FR possible?` is a single check; `Available all nights?` means every night for the prompt's guests; `Price clear and complete?` = an amount for the cheapest available option that is clearly the total for all guests, all nights, all mandatory fees, in a known currency (§7). The agent does **not** know the online price; comparing is the orchestrator's job (`Quote verified?` in Diagram 1).
 
 The voice agent ends the call and **returns a structured result**. It never decides on its own that the task is done (F12).
 
@@ -108,33 +110,25 @@ flowchart TD
     IVRok -->|"No, IVR attempts left"| IVR
     IVRok -->|"No, limit reached"| Fail2["outcome: ivr_failed"]
     Who -->|"Human"| Lang{"Language?"}
-    Lang -->|"English or French"| Open["Opening: enquiry only, not a booking; dates and guests from prompt"]
+    Lang -->|"English or French"| Open["Wait for greeting, then ask in one go: cheapest available option and full-stay total"]
     Lang -->|"Unknown"| LangQ{"EN or FR possible?"}
     LangQ -->|"Yes"| Open
     LangQ -->|"No"| Fail3["outcome: unsupported_language"]
-    Open --> Avail{"Whole stay available?"}
+    Open --> Avail{"Available all nights?"}
     Avail -->|"No or only partly"| Fail4["outcome: unavailable"]
     Avail -->|"Unclear after clarification limit"| Fail5["outcome: unconfirmed"]
-    Avail -->|"Yes"| Quote["Ask full-stay total: currency, taxes and fees, conditions"]
-    Quote --> Cmp{"Phone vs online total?"}
-    Cmp -->|"Higher"| MatchAsk["Ask once to match the online rate"]
-    Cmp -->|"Match or lower"| LowerAsk["Ask once for a lower or direct-booking rate"]
-    Cmp -->|"Basis unclear"| Clarify["Clarify amount and basis, bounded"]
-    MatchAsk --> Final["Staff confirms final quote and its conditions"]
-    LowerAsk --> Final
-    Clarify --> Final
-    Final --> FinalOk{"Final quote OK?"}
-    FinalOk -->|"Yes"| Ref["Optional, ask once: enquiry reference or staff name, no booking"]
-    FinalOk -->|"Higher"| Fail6["outcome: price_mismatch"]
-    FinalOk -->|"Unknown"| Fail5
-    Ref --> Close["Close: thank you, we will get back to you"]
+    Avail -->|"Yes"| Gap{"Price clear and complete?"}
+    Gap -->|"Missing item, clarifications left"| AskGap["Ask only the missing item: amount, per night or total, everyone, fees, currency, cheaper option"]
+    AskGap --> Gap
+    Gap -->|"Still unclear, limit reached"| Fail5
+    Gap -->|"Yes"| Ref["Optional, only if relaxed: ask once for a quote reference"]
+    Ref --> Close["Close: okay, thanks, bye"]
     Close --> Ret(["Hang up, return structured result to orchestrator"])
     Fail1 --> Ret
     Fail2 --> Ret
     Fail3 --> Ret
     Fail4 --> Ret
     Fail5 --> Ret
-    Fail6 --> Ret
     style Ret fill:#e3f2fd,stroke:#1565c0
     style Ref fill:#f5f5f5,stroke:#757575,stroke-dasharray: 4 3
 ```
@@ -149,12 +143,12 @@ flowchart TD
 | # | Step | Agent goal | Required to capture | Optional |
 |---|---|---|---|---|
 | 1 | Dial | Call the selected candidate | `dialed_phone`, `attempt_id`, `call_id` | — |
-| 2 | Opening | One sentence: enquiry only; `check_in`, `check_out`, `guests` from the prompt | Who answered, language | — |
-| 3 | Availability | Whole stay (every night) for these guests | `availability_status` (confirmed / unavailable / unknown), room or bed type | — |
-| 4 | Quote | Full-stay total, currency, taxes/fees, conditions | `final_amount`, `currency`, `basis`, `tax_fee_status`, `conditions` | Nightly breakdown |
-| 5 | Lower rate | Ask **once** to match (if higher) or for a lower rate (if already OK) | The final confirmed quote (⚡ a conditional "if you book now" price counts; we still don't book) | — |
-| 6 | Reference | Ask **once** for an enquiry reference or staff name, without booking | — | `enquiry_reference` + `reference_type`, `staff_name` |
-| 7 | Close | "Thank you, we'll get back to you." Hang up | — | — |
+| 2 | Opening | **Reception speaks first.** Then one question: name, dates, guests, **cheapest available option** (bed, shared or private room) and **full-stay total incl. all taxes and fees** | Who answered, language | — |
+| 3 | Availability | Every night, for these guests | `availability_status` (confirmed / unavailable / unknown), option type (bed / shared / private) | — |
+| 4 | Fill gaps | Ask **only** what's unclear or missing (§7 table). Clear and complete → skip | `options[]` with `amount`, `currency`, `basis`, `tax_fee_status`, `conditions` | Nightly breakdown |
+| 5 | Reference | **Only if the call is relaxed:** ask once for a quote reference, without booking | — | `enquiry_reference` + `reference_type`; staff name only if they volunteer it |
+| 6 | Close | "Okay, thanks. Bye." Hang up. No callback promise | — | — |
+| 7 | Compare | Orchestrator compares the cheapest confirmed option with the online price and other candidates | `comparison_status` | — |
 | 8 | Evidence | Fetch the **full transcript** of this call; extract and validate | `transcript`, all email fields | — |
 | 9 | Email | Send in the current template | `submission_status`, `provider_message_id` | — |
 
@@ -162,18 +156,21 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 
 ### Script lines (EN / FR)
 
-`{team_identity}`, dates and guests come from config and the prompt. Never hard-code them.
+`{caller_name}`, dates and guests come from config and the prompt. Never hard-code them. Full ElevenLabs prompt: `call-agent-prompt.md`.
 
 | Moment | English | Français |
 |---|---|---|
-| Opening | "Hi, this is {team_identity}. I'm checking availability and rates, just an enquiry, not a booking. Do you have a room for {guests} guest(s), checking in {check_in}, checking out {check_out}?" | « Bonjour, ici {team_identity}. Je vérifie la disponibilité et les tarifs, c'est seulement une demande d'information, pas une réservation. Avez-vous une chambre pour {guests} personne(s), arrivée le {check_in}, départ le {check_out} ? » |
-| Quote | "What's the total for the whole stay, including taxes and fees?" | « Quel est le total pour tout le séjour, taxes et frais compris ? » |
-| Match | "We saw {online_total} online for the same stay. Can you match that?" | « Nous avons vu {online_total} en ligne pour le même séjour. Pouvez-vous offrir le même prix ? » |
-| Lower | "Is there any lower or direct-booking rate?" | « Avez-vous un tarif plus bas ou un tarif pour réservation directe ? » |
-| Reference | "Is there a quote reference I can mention when I follow up, without making a reservation?" | « Avez-vous un numéro de référence pour ce tarif, sans faire de réservation ? » |
-| Card asked | "I'm only checking rates today, so no card for now. Could you still confirm the total?" | « Je vérifie seulement les tarifs aujourd'hui, donc pas de carte pour l'instant. Pouvez-vous quand même confirmer le total ? » |
-| Offer to book | "Please don't book it. I'll get back to you." | « Ne réservez pas, s'il vous plaît. Je vous rappelle. » |
-| Close | "Thank you, we'll get back to you." | « Merci, nous vous rappellerons. » |
+| Opening (after their greeting) | "Hi, my name is {caller_name}. I was wondering what your cheapest option is from {check_in} to {check_out}, for {guests}? And what would the total be, including all taxes and fees?" | « Bonjour, je m'appelle {caller_name}. Je voulais savoir quelle est votre option la moins chère du {check_in} au {check_out}, pour {guests} ? Et ça ferait combien au total, avec toutes les taxes et les frais ? » |
+| Missing: amount | "Sorry, how much was that?" | « Pardon, c'était combien ? » |
+| Missing: per night or total | "Is that per night or for the whole stay?" | « C'est par nuit ou pour tout le séjour ? » |
+| Missing: everyone | "Is that the total for all of us?" | « C'est le total pour tout le monde ? » |
+| Missing: fees | "Does that include all taxes and mandatory fees?" | « Est-ce que ça inclut toutes les taxes et les frais obligatoires ? » |
+| Missing: currency | "Is that in Canadian dollars?" | « C'est en dollars canadiens ? » |
+| Missing: cheapest option | "Is there anything cheaper, like a bed in a shared room?" | « Est-ce qu'il y a quelque chose de moins cher, comme un lit en dortoir ? » |
+| Reference (optional) | "Is there a reference number for that quote?" | « Est-ce qu'il y a un numéro de référence pour ce prix ? » |
+| Card asked | "I'm just checking prices for now, so no card. Could you still tell me the total?" | « Je regarde seulement les prix pour l'instant, donc pas de carte. Vous pouvez quand même me dire le total ? » |
+| Offer to book / hold | "No thanks, I'm just checking prices for now." | « Non merci, je regarde seulement les prix pour l'instant. » |
+| Close | "Okay, thanks. Bye." | « D'accord, merci. Bonne journée. » |
 
 ---
 
@@ -184,13 +181,14 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 | **Hold / "please wait"** | Stay silent and keep the line open | Human returns → resume the **first unconfirmed** step. `hold_timeout` → `hold_timeout`. Re-entering hold does **not** reset the call or run budget |
 | **Transfer / IVR again** | Keep all confirmed fields; run the bounded IVR loop | On pickup, check it's still the same property, then resume |
 | **Card / payment request** | Decline politely (script) | Can still get the quote → resume. Payment required to confirm anything → `payment_required` |
-| **Offer to book or hold** ("I'll book it now, no card needed") | Refuse: "Please don't book it" | Continue the enquiry. If a reference only comes *with* a booking → give up the reference; the quote still stands (T07, T21) |
+| **Offer to book or hold** ("I'll book it now, no card needed") | Refuse: "No thanks, I'm just checking prices for now" | Continue the enquiry. If a reference only comes *with* a booking → give up the reference; the quote still stands (T07, T21) |
 | **Staff say a booking was already made** | Clarify and ask them to cancel it; record it as an anomaly | Never report it as a normal enquiry success, never claim it was cancelled without proof |
 | **Language switch** | Switch EN↔FR, keep all fields | Unknown language → one check (Diagram 2) → `unsupported_language` |
-| **Bad line / unclear answer** | Ask to repeat, then read back once (`clarification_limit`) | Still unclear → `unconfirmed` or `line_failure` |
-| **New staff corrects the price** | The **latest explicit** quote for this stay wins; keep both in the log | Re-run the comparison |
+| **Bad line / unclear answer** | Ask only about the part you missed (`clarification_limit`). Fast but clear speech is **not** a reason to read back | Still unclear → `unconfirmed` or `line_failure` |
+| **Price corrected** ("sorry, I meant 95") | Same option → replace the number; keep the old one in `corrected_from` | Continue |
+| **Another option offered** (dorm bed, then private room) | Keep **both** as separate `options[]` | The later option never overwrites a cheaper one; the orchestrator picks the cheapest confirmed |
 | **Disconnected** | Save what we have | Key confirmations + transcript complete → evaluate normally (a missing "goodbye" is fine). Otherwise → `line_failure` |
-| **Asked for name / contact** | Give the configured `team_identity` / `approved_contact` only | Not configured → "This is an enquiry only." Can't continue without it → `info_required` |
+| **Asked for name / contact** | Give `caller_name` (a real team member, with their OK), dates and guests. Phone, email or card → "I'm just checking prices for now." Never invented | Asked for something else we can't give → `info_required` |
 | **Asked "are you a bot?"** | Answer truthfully using the configured introduction | Continue |
 | **Telephony / runtime error** | Log the error and the budget used | `provider_error` → bounded retry or next candidate; never shown as success |
 | **Run deadline / cancel** | Stop new work, end the call if possible, keep the records | `timed_out` / `cancelled`; email status kept separately |
@@ -206,9 +204,9 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 | No answer / busy / voicemail | Hang up, no message | `no_answer` / `voicemail` → next |
 | Fully booked, or only some nights free | Thank them, close | `unavailable` → next |
 | "Maybe" / "ask the manager" / "call back tomorrow" | One clarification | `unconfirmed` → next. Never treated as available |
-| Final quote higher, no match | Asked once to match, once for a lower rate | `price_mismatch` → next (AS §5) |
-| Higher at first, then matched or discounted | Re-check the **final** quote | Can succeed (T03) |
-| Lower only "if you book now" | Record the price + the condition; "I'll get back to you" | Counts as our quote (⚡ AS §6); no booking |
+| Phone total higher than online | No matching, no negotiating; just record it | Orchestrator: `price_mismatch` → next (AS §5) |
+| They volunteer a lower price "if you book now" | Record the price + the condition; don't book | Counts as our quote (⚡ AS §6) |
+| They quote a private room first | Ask once: "Anything cheaper, like a bed in a shared room?" | Keep both options |
 | Price basis unclear (per night vs stay, tax, currency, per bed vs room) | Clarify; normalise only from the staff's actual numbers | Still not comparable → `unconfirmed` → next |
 | Member-only rate | Record it as conditional, eligibility unknown | Not comparable unless a public rate is also confirmed |
 | Wrong property / same name, different address | Don't mix data | `wrong_property` → next |
@@ -226,12 +224,12 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 4. Preferred question: "full-stay total including known mandatory taxes and fees". If staff confirm that number, don't ask for a breakdown.
 5. A pre-tax vs pre-tax comparison is allowed only if `price_comparison_basis` permits it (team decision, §11); then label it "pre-tax", never "total incl. tax".
 6. Verdict: `comparable_match_or_lower` | `comparable_higher` | `not_comparable_or_unknown`. The third one is **not** success, and it is not "they refused to match".
-7. Our own reading of the online price is **not** confirmation. Staff must state or clearly agree to the number (T04).
+7. The agent never says the online price. The quote must come from staff (T04).
+8. Ask for missing pieces only (amount, per night vs total, all guests, mandatory fees, currency). A clear, complete answer needs no confirmation.
 
 | Example (test data, not real quotes) | Result |
 |---|---|
 | Online $100, phone $140 final, same basis | `price_mismatch` |
-| Online $100, phone $140 → matched to $100 | OK |
 | Online $100, phone $85 "if you book now" | OK: record $85 + the condition; don't book |
 | Online stay total $220; phone $100/night × 2 + $30 confirmed fees | Phone total = $230 → `price_mismatch` |
 | Online incl. tax, phone excl. tax, tax unknown | `not_comparable_or_unknown` → clarify → else next |
@@ -243,7 +241,7 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 
 | Component | Owns |
 |---|---|
-| **Voice agent** (ElevenLabs) | Conversation, language, IVR/hold behaviour, availability and quote questions, optional reference, refusing booking and payment. Returns a structured result |
+| **Voice agent** (ElevenLabs) | Conversation, language, IVR/hold behaviour, asking for the cheapest option and its full total, filling gaps, optional reference, refusing booking and payment. Does **not** know the online price. Returns a structured result |
 | **Telephony integration** | Dialing, call status, DTMF execution, hang-up, `call_id`, transcript retrieval |
 | **Orchestrator** | Preflight, candidate queue, budgets, quote verdict, evidence check, email, terminal states |
 | **UI / metrics** | Shows the **real** states (§10), live transcript, time, tokens, cost, final email |
@@ -294,7 +292,7 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 | `submission_email` | — | **Required, still TBA** (Notion). Missing → `configuration_error` |
 | `team_number` | 20 | Set (team check-in; already in agent-spec) |
 | `email_template_version` | Notion, checked 10:50 | **Re-check at ~17:00** |
-| `team_identity` / `approved_contact` | — | **Team decision before run.** Never invented |
+| `caller_name` | — | **Team decision before run.** Real team member's first name, with consent. Never invented |
 | `guests_default` | 1, only if the prompt gives no number | Suggested default; never overrides the prompt |
 | `ring_timeout_s` | 25 | Suggested default |
 | `ivr_attempt_limit` | 3 | Suggested default |
@@ -318,7 +316,7 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 |---|---|---|---|
 | 1 | Hold / call / run time limits | Suggested default | §11 values; tune in testing |
 | 2 | Taxes and fees | Team decision | Ask for the full-stay total incl. known fees; unknown ≠ 0 (§7) |
-| 3 | Name / contact the agent gives | Team decision | Configure `team_identity` before the run; nothing invented |
+| 3 | Name / contact the agent gives | Team decision | Configure `caller_name` before the run; no phone, email or card is given |
 | 4 | Can our telephony send **DTMF** keypresses? | **Integration check** | Unverified. Fallback: say "reservations" / "operator" → `ivr_failed` |
 | 5 | Sequential vs parallel calls | Suggested default | Sequential for MVP. Parallel needs winner selection, duplicate-send guard, ending the losing calls and a shared budget |
 | 6 | Can we get the **full transcript** of each call quickly after hang-up? | **Integration check** | Unverified; bounded by `transcript_retrieval_budget_s` |
@@ -334,7 +332,7 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 
 | ID | Fix | Where |
 |---|---|---|
-| F01 | The final quote is re-checked; higher → `price_mismatch` → next; unknown ≠ match | Diagram 2 `FinalOk`; Diagram 1 `Eval`; §7 |
+| F01 | The quote is re-checked by the orchestrator; higher → `price_mismatch` → next; unknown ≠ match (v0.3: moved out of the call) | Diagram 1 `Eval`; §7 |
 | F02 | Enquiry-only wording; reference only without booking; refuse "book it" anywhere | §1 hard rules; Diagram 2 `Open`, `Ref`; §4 scripts; §5 |
 | F03 | Reference and staff name moved to Optional; never block success | §1; §4 table; dashed `Ref` |
 | F04 | Queue-exhausted terminals; candidates marked tried; capped retries | Diagram 1 `More`, `AnyInc`; §11 |
@@ -348,12 +346,22 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 | F12 | Voice agent returns a result; the orchestrator owns queue, verdict, email | Diagram 1 vs 2; §8 |
 | F13 | Preflight config check; bounded email retry; one logical id; unknown status | Diagram 1 `Pre`, `Send`, `Sent`; §11 |
 | F14 | DTMF, transcript and language marked "needs integration check" | §12 #4, #6, #7 |
-| F15 | Configured identity; `unknown` language exit; `info_required` | Diagram 2 `LangQ`; §5 |
+| F15 | Configured caller name (v0.2.1: reception speaks first, natural guest opening); `unknown` language exit; `info_required` | Diagram 2 `LangQ`; §5 |
 | F16 | Per-attempt ids; every outcome logged; evidence tied to the selected attempt | §9; Diagram 1 `Log` |
 | F17 | Diagrams, tables, scripts and questions aligned; 90 s is a config value | Whole doc |
 | F18 | Sequential, first verified result wins, no "cheapest in market" claim | §2 stop policy; §11; §12 #5 |
 
 ---
+
+### v0.3 changes (team review)
+
+| Change | Why |
+|---|---|
+| One opening question asks for the cheapest available option + full-stay total (beds, shared and private rooms) | Gets the full answer in one turn; doesn't default to private rooms |
+| Removed price matching and the fixed lower-rate ask; the agent no longer knows the online price | Comparison is done in code before and after the call; no anchoring; fewer turns |
+| Confirm only unclear or missing items | Fewer turns; fast speech alone doesn't trigger a read-back |
+| Removed staff name ask and callback promise; reference only if the call is relaxed | Doesn't help get the price; the reference is kept as an optional ask for Call Handling |
+| Price correction vs. a different option are handled separately | A later, pricier option must not overwrite a cheaper one |
 
 ## 14. Scenario walkthrough (paper check only)
 
@@ -362,10 +370,10 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 | ID | Path through the document | ✅ |
 |---|---|---|
 | T01 | Human EN → Avail yes → match → `Ref` → `Ret` → `Eval` yes → `Ready` → `Send` → `submitted`, one id | ✅ |
-| T02 | `Cmp` higher → `MatchAsk` → `Final` $140 → `FinalOk` higher → `price_mismatch` → `Log` → next | ✅ |
-| T03 | `Cmp` higher → match to $100 → `FinalOk` yes | ✅ |
-| T04 | §7 rule 7: our read-back ≠ confirmation → `Clarify` → `unconfirmed` if staff don't confirm | ✅ |
-| T05 | §6 "if you book now" → record $85 + condition, no booking | ✅ |
+| T02 | Staff quote $140, agent records it, no matching → `Ret` → Diagram 1 `Quote verified?` no (`price_mismatch`) → `Log` → next | ✅ |
+| T03 | v0.3: the agent no longer asks to match. If staff **volunteer** $100, that's the recorded quote → `Quote verified?` yes | ✅ (changed by design) |
+| T04 | §7 rule 7: the agent never says the online price, so a staff-stated number is the only quote | ✅ |
+| T05 | §6 volunteered "if you book now" price → record $85 + condition, no booking | ✅ |
 | T06 | `Ref` is optional; §1 lists no reference/name requirement | ✅ |
 | T07 | §5 booking offer: give up the reference, quote stands | ✅ |
 | T08 | §5 card request: decline → resume the first unconfirmed step | ✅ |
