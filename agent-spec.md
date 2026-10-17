@@ -15,7 +15,8 @@
 
 | Stage | What decides it |
 |---|---|
-| **Shortlist (top 3)** | **Fastest** valid email × **lowest** confirmed price |
+| **Shortlist (top 3)** | **Fastest** valid email × **lowest** confirmed price (⚡ "cost" = **hotel price only**) |
+| **Tiebreaker (top 3)** | ⚡ **Token count** (with time and price) |
 | **Judges (top 3 only)** | Total Time (10) · Call Handling (10) · Learnings (10) |
 
 - *Call Handling*: natural conversation, handles **IVR menus and holds**, gets a confirmation / reservation #.
@@ -51,8 +52,9 @@ _____                        ← REQUIRED proof the call happened
 ```
 
 - ⚡ **The transcript is mandatory.** It is the primary proof.
-- ⚡ **A reservation # is nice to have, not required.** The host may remove it. Include it if the property offers a hold or a number.
-- The final template may be updated on Notion. **Re-check at 5 PM.**
+- ⚡ **A reservation # is nice to have, not required.** Ask for one only if it needs no credit card ("Is there a reservation number I can follow up on later?").
+- ⚡ Host specifically wants: **address, the phone number we called, transcript.**
+- The template lives on Notion and the host will keep updating it. **Re-check at 5 PM.**
 
 ---
 
@@ -103,7 +105,7 @@ _____                        ← REQUIRED proof the call happened
 | **ElevenLabs** for the call + its API to extract info | |
 | Backboard (multi-LLM, memory, RAG, web search; code `TECHTO7327`) | |
 
-> ⚠️ The transcript was contradictory on **browser-use-style scraping libraries**. **Ask the host before relying on one.**
+> ⚡ **browser-use is allowed** (host confirmed in follow-up Q&A).
 
 **Scope: "cheapest stay"**: hostels, motels, B&Bs, hotels, Airbnb… anything bookable online with a phone number we can call. Hotel class does not matter.
 
@@ -147,10 +149,10 @@ The agent should emit structured events (step, status, elapsed_ms, tokens, data,
 
 ## 11. Open questions
 
-- [ ] Destination email address + final email template
-- [ ] Is browser-use (or similar) allowed?
-- [ ] Is a reservation # still required?
-- [ ] How is "cost" measured for ranking: room price only, or also tokens/API spend?
+- [ ] Destination email address (template is on Notion, may still change)
+- [x] Is browser-use allowed? → **Yes**
+- [x] Is a reservation # required? → **No**, only if obtainable without a credit card
+- [x] How is "cost" measured? → **Hotel price only**; tokens are the tiebreaker among the top 3
 - [ ] Our team number (for the email subject)
 
 ## 12. Team decisions to make now
