@@ -34,10 +34,11 @@
 
 ## 4. Output: the email
 
-Sent to the address the organizers provide (TBA).
+Sent to the address the organizers provide (**still TBA** on Notion as of 10:50).
+**We are Team 20.** Notion template checked at 10:50: unchanged; fields below marked ← are our additions from the judging criteria and the host's Q&A.
 
 ```
-Subject: Team # X - Hotel Reservation Confirmed!
+Subject: Team # 20 - Hotel Reservation Confirmed!
 
 Hotel Name: _____
 Address: _____
@@ -153,7 +154,7 @@ The agent should emit structured events (step, status, elapsed_ms, tokens, data,
 - [x] Is browser-use allowed? → **Yes**
 - [x] Is a reservation # required? → **No**, only if obtainable without a credit card
 - [x] How is "cost" measured? → **Hotel price only**; tokens are the tiebreaker among the top 3
-- [ ] Our team number (for the email subject)
+- [x] Our team number → **Team 20**
 
 ## 12. Team decisions to make now
 
