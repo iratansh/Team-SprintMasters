@@ -123,8 +123,8 @@ flowchart TD
     Gap -->|"Missing item, clarifications left"| AskGap["Ask only the missing item: amount, per night or total, everyone, fees, currency, cheaper option"]
     AskGap --> Gap
     Gap -->|"Still unclear, limit reached"| Fail5
-    Gap -->|"Yes"| Ref["Ask once for a reservation or reference number, then end the call"]
-    Ref --> Close["Close: okay, thanks, bye"]
+    Gap -->|"Yes"| Ref["Ask once for a reservation number: only if given right away, no waiting, then hang up"]
+    Ref --> Close["End the call immediately, no goodbye"]
     Close --> Ret(["Hang up, return structured result to orchestrator"])
     Fail1 --> Ret
     Fail2 --> Ret
@@ -147,8 +147,8 @@ flowchart TD
 | 2 | Opening | **Reception speaks first.** Then one question: dates, guests, **cheapest available option** (bed, shared or private room) and **full-stay total incl. all taxes and fees** | Who answered, language | — |
 | 3 | Availability | Every night, for these guests | `availability_status` (confirmed / unavailable / unknown), option type (bed / shared / private) | — |
 | 4 | Fill gaps | Ask **only** what's unclear or missing (§7 table). Clear and complete → skip | `options[]` with `amount`, `currency`, `basis`, `tax_fee_status`, `conditions` | Nightly breakdown |
-| 5 | Reservation # | **Always ask once** right after the price, without booking or a card. Whatever the answer, close and hang up. Never ask for names | — | `enquiry_reference` + `reference_type` |
-| 6 | Close | "Okay, thanks. Bye." Hang up. No callback promise | — | — |
+| 5 | Reservation # | **Always ask once** right after the price, without booking or a card. Take it only if given right away; hold, "let me check", or needing details → hang up. Never ask for names | — | `enquiry_reference` + `reference_type` |
+| 6 | Close | End the call immediately after the reservation # question. No thanks, no goodbye | — | — |
 | 7 | Compare | Orchestrator compares the cheapest confirmed option with the online price and other candidates | `comparison_status` | — |
 | 8 | Evidence | Fetch the **full transcript** of this call; extract and validate | `transcript`, all email fields | — |
 | 9 | Email | Send in the current template | `submission_status`, `provider_message_id` | — |
@@ -172,7 +172,7 @@ Hotel name, destination phone and dates come from the calling API; guests defaul
 | Reference (optional) | "Is there a reference number for that quote?" | « Est-ce qu'il y a un numéro de référence pour ce prix ? » |
 | Card asked | "I'm just checking prices for now, so no card. Could you still tell me the total?" | « Je regarde seulement les prix pour l'instant, donc pas de carte. Vous pouvez quand même me dire le total ? » |
 | Offer to book / hold | "No thanks, I'm just checking prices for now." | « Non merci, je regarde seulement les prix pour l'instant. » |
-| Close | "Okay, thanks. Bye." | « D'accord, merci. Bonne journée. » |
+| Close (after price + reservation # question) | *(hang up, no goodbye)* | *(raccrocher, sans au revoir)* |
 
 ---
 
