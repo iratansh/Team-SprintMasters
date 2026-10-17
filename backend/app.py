@@ -1,4 +1,4 @@
-"""Local-only HTTP endpoints for testing a Backboard API connection."""
+"""Local-only Backboard testing and ElevenLabs hotel-call controls."""
 
 import asyncio
 import logging
@@ -21,6 +21,12 @@ from pydantic import (
     SecretStr,
     ValidationError,
     model_validator,
+)
+
+from backend.elevenlabs_routes import (
+    ElevenLabsSettings,
+    get_elevenlabs_settings,
+    router as elevenlabs_router,
 )
 
 ENV_PATH = Path(__file__).resolve().parent / ".env"
@@ -151,17 +157,25 @@ def _upstream_error(error: Exception) -> HTTPException:
     return HTTPException(status_code=status_code, detail=detail)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *, elevenlabs_settings: ElevenLabsSettings | None = None,
+) -> FastAPI:
     application = FastAPI(
-        title="SprintMasters API Test Backend",
-        version="0.1.0",
+        title="SprintMasters Agent Backend",
+        version="0.2.0",
         description=(
             "Local Backboard connectivity test. GET /health makes no model call. "
-            "POST /api/test makes one model request using the server-side key."
+            "POST /api/test makes one model request using the server-side key. "
+            "ElevenLabs routes control an existing agent; calls/preview never dials. "
+            "Real calls require both a server-side enable flag and confirm_call=true."
         ),
     )
     if settings is not None:
         application.dependency_overrides[get_settings] = lambda: settings
+    if elevenlabs_settings is not None:
+        application.dependency_overrides[get_elevenlabs_settings] = lambda: elevenlabs_settings
+    application.include_router(elevenlabs_router)
 
     @application.exception_handler(RequestValidationError)
     async def validation_error_handler(_request, error: RequestValidationError) -> JSONResponse:

@@ -1,8 +1,10 @@
-# Python 后端：Backboard API 连通测试
+# Python 后端：Backboard 测试与 ElevenLabs 电话接入
 
 这个最小后端使用 FastAPI 和官方 `backboard-sdk==1.5.19`。
-它提供一次模型调用的测试入口，返回回复、耗时、token 用量及会话编号。
-当前功能仅测试 API；酒店搜索、电话确认和邮件流程留给后续开发。
+Backboard 接口提供一次模型调用的测试入口，返回回复、耗时、token 用量及会话编号。
+已有 ElevenLabs agent 与 Twilio 号码的酒店数据接入、预览、安全外呼及转写查询，见
+[ElevenLabs 使用说明](ELEVENLABS.md)。真实外呼默认关闭；酒店搜索 CLI、自动候选队列和邮件
+尚未实现。以下章节保留 Backboard 的安装、配置和测试说明。
 
 ## 1. 安装
 
