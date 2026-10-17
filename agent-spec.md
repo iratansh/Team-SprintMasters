@@ -35,27 +35,25 @@
 
 ## 4. Output: the email
 
-Sent to the address the organizers provide (**still TBA** on Notion as of 10:50).
-**We are Team 20.** Notion template checked at 10:50: unchanged; fields below marked ← are our additions from the judging criteria and the host's Q&A.
+Sent to the address the organizers provide (**still TBA**).
+**We are Team 20.** ⚡ **Template updated by the organizers (Oct 17, afternoon)**; use exactly these fields:
 
 ```
 Subject: Team # 20 - Hotel Reservation Confirmed!
 
 Hotel Name: _____
-Address: _____
-Phone: _____
-Price: _____                 ← required by judging criteria
+Hotel Address: _____
+Hotel Phone: _____
+Reservation #: _____                   (if we were able to get one)
 Reservation Date: _____
-Reservation #: _____         ← if obtained (see below)
-Confirmed with: _____        ← name of staff member, if given
-
-Call Transcript:
-_____                        ← REQUIRED proof the call happened
+Price for the stay: _____
+Link To Audio Recording of the conversation: _____   (from ElevenLabs)
 ```
 
-- ⚡ **The transcript is mandatory.** It is the primary proof.
-- ⚡ **A reservation # is nice to have, not required.** Ask for one only if it needs no credit card ("Is there a reservation number I can follow up on later?").
-- ⚡ Host specifically wants: **address, the phone number we called, transcript.**
+- ⚡ **The audio recording link is now the proof** that the call happened. Call recording must be **enabled** (the backend currently sends `call_recording_enabled: false`) and we need a shareable link to the ElevenLabs recording.
+- ⚡ **Reservation # is optional**: the agent asks once after getting the price, without booking or giving a card. If not available, the agent hangs up.
+- ⚡ The phone call only needs the **price**. Hotel name, address and phone come from the search result and the number we dialed.
+- Keeping the transcript in our own logs is still useful for debugging, but it's no longer a template field.
 - The template lives on Notion and the host will keep updating it. **Re-check at 5 PM.**
 
 ---
@@ -68,7 +66,7 @@ _____                        ← REQUIRED proof the call happened
 3. Rank                → by total price; keep a fallback queue (#2, #3 …)
 4. Call #1             → ElevenLabs voice agent: confirm availability, dates, price
        ↳ no answer / no vacancy / price mismatch → call next in queue
-5. Extract             → price, confirmation #, staff name, transcript
+5. Extract             → price, reservation # (if any), audio recording link
 6. Email               → send proof in the required format
 ```
 

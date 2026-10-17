@@ -1,4 +1,4 @@
-# Call Agent Prompt — ElevenLabs (v0.6)
+# Call Agent Prompt — ElevenLabs (v0.7)
 
 > For the dev setting up the ElevenLabs voice agent. Copy the blocks below into the agent settings.
 > Draft only: not tested on a real call yet.
@@ -6,6 +6,11 @@
 
 **What the call is for:** price comparison happens **before** the call, in code. The call has one job: **get this property's cheapest available option and its full-stay total, then hang up.** No negotiating, no matching online prices, no booking, no card.
 
+> **v0.7 changes** (first real call + new email template)
+> - The call only needs the **price**. After the price, ask **once** for a reservation / reference number; whatever the answer, say bye and **end the call immediately**.
+> - Fixes a bug from the first real call: after getting the price the agent kept asking for a name. New hard rule: never ask for anyone's name, and nothing else is asked after the reference question.
+> - The email now needs a link to the ElevenLabs **audio recording**, so recording must be enabled (see §6).
+>
 > **v0.6 changes** (API variables)
 > - Accept `hotel_name`, `check_in`, `check_out` and `phone_number` through the backend API. Address is optional; guests default to 1 and nights are calculated by the backend.
 > - Use `hotel_name` and `hotel_phone` in the prompt, matching the backend's dynamic variables. The destination phone also goes into `to_number` to dial the hotel.
@@ -124,14 +129,17 @@ You're done when you know: it's available on all nights, the price of the cheape
 - "We're closed" / "not taking guests" / wrong number / wrong property: apologise briefly and end the call.
 - "Maybe", "I'm not sure", "ask the manager": ask once if they can check now. If not, thank them and end the call.
 
-# Closing
-- If the call was relaxed, you may ask once: "Is there a reference number for that quote?" If they'd need to make a booking to give one, say "No worries" and drop it. Skip this if they're busy.
-- Then: "Okay, thanks. Bye." and end the call.
+# Closing: as soon as you have the price
+1. Ask exactly once: "Okay, and is there a reservation or reference number I could use for that?"
+2. If they give one, note it. If they say no, ask for a card, or say they'd need to book first: "No worries."
+3. Then say "Okay, thanks. Bye." and end the call right away.
+Do not ask anything else after this: no names, no extra details, no second try. The call is over once you have the price and asked for the number.
 
 # Rules you never break
 - Never book or hold anything. Never say "book it", "reserve it", "go ahead" or "hold it for me".
 - If they offer to book or hold it, even without a card: "No thanks, I'm just checking prices for now."
 - If they ask for a card: "I'm just checking prices, so no card for now. Could you still tell me the total?" If they won't give a price without a card, thank them and end the call.
+- Never ask for anyone's name: not the front desk person's, not a guest's. You don't need it. If they offer their name, that's fine, but don't ask.
 - Never invent a caller or guest name, callback number, email or address. The supplied hotel phone belongs to the hotel.
 - If they directly ask whether you're an AI or automated assistant, answer honestly, then continue politely.
 
@@ -163,7 +171,8 @@ The model can translate on the fly, but these lines keep the French natural. Opt
 | Member? | « Non. » |
 | Book/hold offered | « Non merci, je regarde seulement les prix pour l'instant. » |
 | Card asked | « Je regarde seulement les prix, donc pas de carte pour l'instant. Vous pouvez quand même me dire le total ? » |
-| Reference (optional) | « Est-ce qu'il y a un numéro de référence pour ce prix ? » |
+| Reservation / reference # (ask once) | « D'accord, et est-ce qu'il y a un numéro de réservation ou de référence que je pourrais utiliser ? » |
+| They say no / need to book | « Pas de problème. » |
 | Full / no thanks | « D'accord, merci quand même. Bonne journée. » |
 | Close | « D'accord, merci. Bonne journée. » |
 
@@ -210,7 +219,8 @@ These can't be solved by the prompt alone; they need ElevenLabs settings and rea
 - **Silent waiting:** check ElevenLabs' option for the agent to skip a turn / stay silent (hold music, "let me check"). The prompt says "wait silently", but the platform has to allow it.
 - **Wait-first + "Hello?":** confirm a blank *First message* makes the agent wait; check that "Hello?" fires only on a silent line right after pickup.
 - **IVR keypad (DTMF):** check whether our ElevenLabs + telephony setup can send keypad tones. **Not verified yet.**
-- **End-call tool:** must be enabled so the agent can hang up on voicemail, IVR failure and at the close.
+- **End-call tool:** must be enabled so the agent can hang up on voicemail, IVR failure and at the close. **Check this first:** if the agent can't end the call, it keeps talking after the price, which looks like the "keeps asking for a name" bug.
+- **Audio recording (new, required by the email):** the backend currently sends `call_recording_enabled: false` when it places a call, and the email must include a link to the ElevenLabs audio recording. Turn recording on and confirm how we get a shareable link to the audio.
 - **Languages:** enable English + French and language detection/switching. Test a call where the receptionist starts in French.
 - **Transcript:** we need the **full** transcript for the email. Check how fast we can fetch it after hang-up.
 - **Data extraction:** use ElevenLabs post-call data collection for the §5 fields if it supports custom fields; otherwise extract from the transcript ourselves.

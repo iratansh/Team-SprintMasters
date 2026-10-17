@@ -1,4 +1,4 @@
-# Hotel Call Flow — Team SprintMasters (v0.3.2)
+# Hotel Call Flow — Team SprintMasters (v0.3.3)
 
 > How our agent phones a property and turns the call into a valid submission. Owner: Design.
 > Baseline: `agent-spec.md` (team repo, current version). v0.1 was reviewed against the repair brief (F01–F18); see §13.
@@ -6,6 +6,8 @@
 > **The call is an enquiry, not a booking.** We confirm availability and a price, optionally ask for a reference, and email the proof. We **never book, never hold a room, never pay**.
 >
 > **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.6 (v0.3.2: API variables aligned; no caller name required; clarification limit still counts per field).
+>
+> **v0.3.3:** the call only needs the price; after it, ask once for a reservation #, then hang up. Email proof is now the ElevenLabs **audio recording link** (see `agent-spec.md` §4).
 >
 > **Status:** the document logic is fixed and has been walked through on paper (§14). **Nothing has been integration-tested yet:** telephony, DTMF, transcript retrieval and email sending are all still unverified (§12).
 
@@ -121,7 +123,7 @@ flowchart TD
     Gap -->|"Missing item, clarifications left"| AskGap["Ask only the missing item: amount, per night or total, everyone, fees, currency, cheaper option"]
     AskGap --> Gap
     Gap -->|"Still unclear, limit reached"| Fail5
-    Gap -->|"Yes"| Ref["Optional, only if relaxed: ask once for a quote reference"]
+    Gap -->|"Yes"| Ref["Ask once for a reservation or reference number, then end the call"]
     Ref --> Close["Close: okay, thanks, bye"]
     Close --> Ret(["Hang up, return structured result to orchestrator"])
     Fail1 --> Ret
@@ -130,11 +132,10 @@ flowchart TD
     Fail4 --> Ret
     Fail5 --> Ret
     style Ret fill:#e3f2fd,stroke:#1565c0
-    style Ref fill:#f5f5f5,stroke:#757575,stroke-dasharray: 4 3
 ```
 
 - Interruptions such as hold, transfer, card request, booking offer, language switch, bad line or disconnect can happen **at any step**. They are handled by the **global event rules in §5**, not by fixed boxes.
-- Every outcome box is a labelled result, not just a colour. The dashed `Ref` box is optional; skipping it or getting a "no" never blocks success.
+- Every outcome box is a labelled result, not just a colour. The `Ref` question is always asked once; a "no" (or "you'd need to book") never blocks success.
 
 ---
 
@@ -146,7 +147,7 @@ flowchart TD
 | 2 | Opening | **Reception speaks first.** Then one question: dates, guests, **cheapest available option** (bed, shared or private room) and **full-stay total incl. all taxes and fees** | Who answered, language | — |
 | 3 | Availability | Every night, for these guests | `availability_status` (confirmed / unavailable / unknown), option type (bed / shared / private) | — |
 | 4 | Fill gaps | Ask **only** what's unclear or missing (§7 table). Clear and complete → skip | `options[]` with `amount`, `currency`, `basis`, `tax_fee_status`, `conditions` | Nightly breakdown |
-| 5 | Reference | **Only if the call is relaxed:** ask once for a quote reference, without booking | — | `enquiry_reference` + `reference_type`; staff name only if they volunteer it |
+| 5 | Reservation # | **Always ask once** right after the price, without booking or a card. Whatever the answer, close and hang up. Never ask for names | — | `enquiry_reference` + `reference_type` |
 | 6 | Close | "Okay, thanks. Bye." Hang up. No callback promise | — | — |
 | 7 | Compare | Orchestrator compares the cheapest confirmed option with the online price and other candidates | `comparison_status` | — |
 | 8 | Evidence | Fetch the **full transcript** of this call; extract and validate | `transcript`, all email fields | — |
@@ -266,7 +267,7 @@ One process may play several roles. This split is about responsibility, not depl
 | Online baseline | `online_quote_raw`, `online_amount`, `currency`, `basis`, `source`, `observed_at` | Source kept |
 | Phone quote | `quoted_amount_raw`, `final_amount`, `currency`, `basis`, `tax_fee_status`, `conditions`, `quote_history[]` | Units always explicit |
 | Comparison | `comparison_status`, `comparison_reason` | Three values (§7) |
-| Optional | `enquiry_reference`, `reference_type`, `staff_name` | May be empty; never fabricated; never a system ID |
+| Optional | `enquiry_reference`, `reference_type`, `staff_name` | May be empty; never fabricated; never a system ID. `staff_name` only if they volunteer it: the agent never asks for the front desk's name |
 | Call | `outcome`, `failure_reason`, `language`, `ivr_seen`, `hold_seconds` | Success and failure both logged |
 | Evidence | `transcript`, `transcript_status`, `evidence_source` | Real full transcript; `[inaudible]` kept as is |
 | Submission | `submission_status`, `logical_submission_id`, `provider_message_id` | One logical id per run |
