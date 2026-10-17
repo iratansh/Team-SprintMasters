@@ -108,6 +108,11 @@ class HotelCallRequest(BaseModel):
         extra="forbid",
         json_schema_extra={"examples": [{
             "hotel_name": "Example Hotel (fictional; preview only)",
+            "check_in": "2026-11-01",
+            "check_out": "2026-11-03",
+            "phone_number": "+14165550123",
+        }, {
+            "hotel_name": "Example Hotel (fictional; preview only)",
             "address": "123 Example Street, Ottawa, ON",
             "phone_number": "+14165550123",
             "check_in": "2026-10-25",
@@ -123,7 +128,7 @@ class HotelCallRequest(BaseModel):
     )
 
     hotel_name: str = Field(min_length=1, max_length=200)
-    address: str = Field(min_length=1, max_length=500)
+    address: str | None = Field(default=None, min_length=1, max_length=500)
     phone_number: str = Field(pattern=r"^\+[1-9]\d{7,14}$", description="Destination in E.164 format.")
     check_in: date
     check_out: date
@@ -151,7 +156,7 @@ def build_call_payload(request: HotelCallRequest, config: ElevenLabsSettings) ->
     """Only flat, scalar context; never override the shared agent's prompt or tools."""
     variables = {
         "hotel_name": request.hotel_name,
-        "hotel_address": request.address,
+        "hotel_address": request.address if request.address is not None else "unknown",
         "hotel_phone": request.phone_number,
         "check_in": request.check_in.isoformat(),
         "check_out": request.check_out.isoformat(),

@@ -1,7 +1,9 @@
 """Offline ElevenLabs route contracts: no credentials, network or real calls."""
 
+import re
 from collections.abc import AsyncIterator
 from copy import deepcopy
+from pathlib import Path
 
 import httpx
 import pytest
@@ -158,7 +160,52 @@ def test_local_status_and_preview_never_construct_client(
     assert FAKE_SECRET not in status.text + preview.text
 
 
+@pytest.mark.parametrize("path", ["/calls/preview", "/calls"])
+def test_four_field_requests_supply_prompt_variables_and_correct_destination(path: str) -> None:
+    prompt_document = (Path(__file__).resolve().parents[2] / "call-agent-prompt.md").read_text(encoding="utf-8")
+    system_prompt = prompt_document.split("## 3. System prompt", 1)[1].split("```", 2)[1]
+    required_variables = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", system_prompt))
+    assert required_variables
+
+    fake = FakeElevenLabsClient()
+    with offline_client(fake) as client:
+        for hotel, phone, check_in, check_out, nights in [
+            ("First Offline Hotel", "+14165550123", "2026-11-01", "2026-11-03", 2),
+            ("Second Offline Hotel", "+16135550124", "2026-12-30", "2027-01-02", 3),
+        ]:
+            request = {
+                "hotel_name": hotel,
+                "phone_number": phone,
+                "check_in": check_in,
+                "check_out": check_out,
+            }
+            if path == "/calls":
+                request["confirm_call"] = True
+
+            response = client.post(BASE + path, json=request)
+            assert response.status_code == 200
+            if path == "/calls/preview":
+                payload = response.json()["payload"]
+                assert response.json()["dry_run"] is True
+            else:
+                payload = fake.calls[-1][1]
+
+            variables = payload["conversation_initiation_client_data"]["dynamic_variables"]
+            assert required_variables <= variables.keys()
+            assert variables["hotel_name"] == hotel
+            assert payload["to_number"] == variables["hotel_phone"] == phone
+            assert variables["check_in"] == check_in
+            assert variables["check_out"] == check_out
+            assert variables["nights"] == nights
+            assert variables["guests"] == 1
+            assert variables["hotel_address"] == "unknown"
+
+    assert len(fake.calls) == (0 if path == "/calls/preview" else 2)
+
+
 @pytest.mark.parametrize("invalid", [
+    {"address": ""},
+    {"address": "   "},
     {"check_out": "2026-11-01"},
     {"check_out": "2026-10-31"},
     {"phone_number": "6135550123"},

@@ -1,11 +1,11 @@
-# Hotel Call Flow — Team SprintMasters (v0.3.1)
+# Hotel Call Flow — Team SprintMasters (v0.3.2)
 
 > How our agent phones a property and turns the call into a valid submission. Owner: Design.
 > Baseline: `agent-spec.md` (team repo, current version). v0.1 was reviewed against the repair brief (F01–F18); see §13.
 >
 > **The call is an enquiry, not a booking.** We confirm availability and a price, optionally ask for a reference, and email the proof. We **never book, never hold a room, never pay**.
 >
-> **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.5 (v0.3.1: wording synced; clarification limit counts per field).
+> **v0.3 (team review):** price comparison happens **before and after** the call, in code. The call only asks for the property's **cheapest available option + full-stay total**: no matching, no negotiating, no staff name, no callback promise. Agent wording: `call-agent-prompt.md` v0.6 (v0.3.2: API variables aligned; no caller name required; clarification limit still counts per field).
 >
 > **Status:** the document logic is fixed and has been walked through on paper (§14). **Nothing has been integration-tested yet:** telephony, DTMF, transcript retrieval and email sending are all still unverified (§12).
 
@@ -143,7 +143,7 @@ flowchart TD
 | # | Step | Agent goal | Required to capture | Optional |
 |---|---|---|---|---|
 | 1 | Dial | Call the selected candidate | `dialed_phone`, `attempt_id`, `call_id` | — |
-| 2 | Opening | **Reception speaks first.** Then one question: name, dates, guests, **cheapest available option** (bed, shared or private room) and **full-stay total incl. all taxes and fees** | Who answered, language | — |
+| 2 | Opening | **Reception speaks first.** Then one question: dates, guests, **cheapest available option** (bed, shared or private room) and **full-stay total incl. all taxes and fees** | Who answered, language | — |
 | 3 | Availability | Every night, for these guests | `availability_status` (confirmed / unavailable / unknown), option type (bed / shared / private) | — |
 | 4 | Fill gaps | Ask **only** what's unclear or missing (§7 table). Clear and complete → skip | `options[]` with `amount`, `currency`, `basis`, `tax_fee_status`, `conditions` | Nightly breakdown |
 | 5 | Reference | **Only if the call is relaxed:** ask once for a quote reference, without booking | — | `enquiry_reference` + `reference_type`; staff name only if they volunteer it |
@@ -156,7 +156,7 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 
 ### Script lines (EN / FR)
 
-`{caller_name}`, dates and guests come from config and the prompt. Never hard-code them. Full ElevenLabs prompt: `call-agent-prompt.md`.
+Hotel name, destination phone and dates come from the calling API; guests default to 1 when omitted. Speak dates and guest counts naturally. No caller name is required; if asked, identify yourself as an automated assistant checking prices. Full ElevenLabs prompt and API field mapping: `call-agent-prompt.md`.
 
 | Moment | English | Français |
 |---|---|---|
@@ -189,7 +189,7 @@ Turns can be merged to save time. If staff give everything in one answer, don't 
 | **Price corrected** ("sorry, I meant 95") | Same option → replace the number; keep the old one in `corrected_from` | Continue |
 | **Another option offered** (dorm bed, then private room) | Keep **both** as separate `options[]` | The later option never overwrites a cheaper one; the orchestrator picks the cheapest confirmed |
 | **Disconnected** | Save what we have | Key confirmations + transcript complete → evaluate normally (a missing "goodbye" is fine). Otherwise → `line_failure` |
-| **Asked for name / contact** | Give `caller_name` (a real team member, with their OK), dates and guests. Phone, email or card → "I'm just checking prices for now." Never invented | Asked for something else we can't give → `info_required` |
+| **Asked for name / contact** | "I'm an automated assistant checking room prices." Give dates and guests if asked. Phone, email or card → "I'm just checking prices for now." Never invent a guest identity or use the hotel's phone as a callback number | Asked for something else we can't give → `info_required` |
 | **Asked "are you a bot?"** | Answer truthfully using the configured introduction | Continue |
 | **Telephony / runtime error** | Log the error and the budget used | `provider_error` → bounded retry or next candidate; never shown as success |
 | **Run deadline / cancel** | Stop new work, end the call if possible, keep the records | `timed_out` / `cancelled`; email status kept separately |
@@ -297,7 +297,6 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 | `submission_email` | — | **Required, still TBA** (Notion). Missing → `configuration_error` |
 | `team_number` | 20 | Set (team check-in; already in agent-spec) |
 | `email_template_version` | Notion, checked 10:50 | **Re-check at ~17:00** |
-| `caller_name` | — | **Team decision before run.** Real team member's first name, with consent. Never invented |
 | `guests_default` | 1, only if the prompt gives no number | Suggested default; never overrides the prompt |
 | `ring_timeout_s` | 25 | Suggested default |
 | `ivr_attempt_limit` | 3 | Suggested default |
@@ -321,7 +320,7 @@ The UI must never show "Booked" or "Reservation confirmed" as a state. The organ
 |---|---|---|---|
 | 1 | Hold / call / run time limits | Suggested default | §11 values; tune in testing |
 | 2 | Taxes and fees | Team decision | Ask for the full-stay total incl. known fees; unknown ≠ 0 (§7) |
-| 3 | Name / contact the agent gives | Team decision | Configure `caller_name` before the run; no phone, email or card is given |
+| 3 | Name / contact the agent gives | Prompt v0.6 | Identifies as an automated assistant checking prices when asked; no guest name, callback number, email or card is given |
 | 4 | Can our telephony send **DTMF** keypresses? | **Integration check** | Unverified. Fallback: say "reservations" / "operator" → `ivr_failed` |
 | 5 | Sequential vs parallel calls | Suggested default | Sequential for MVP. Parallel needs winner selection, duplicate-send guard, ending the losing calls and a shared budget |
 | 6 | Can we get the **full transcript** of each call quickly after hang-up? | **Integration check** | Unverified; bounded by `transcript_retrieval_budget_s` |
