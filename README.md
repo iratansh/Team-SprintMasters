@@ -12,8 +12,10 @@ Project rules: [agent spec](agent-spec.md), including the team's Ontario-wide sc
 
 ## Python API backend
 
-A FastAPI service adds Backboard connectivity testing and an ElevenLabs adapter
-for an existing agent with a linked Twilio number. See
+A FastAPI service adds Backboard connectivity testing, Gmail SMTP delivery for
+the hotel enquiry confirmation template, and an ElevenLabs adapter for an existing
+agent with a linked Twilio number. Email sends to a server-configured recipient and
+includes the full call transcript. See
 [backend/README.md](backend/README.md) for setup and Backboard testing, and
 [backend/ELEVENLABS.md](backend/ELEVENLABS.md) for hotel-data previews, guarded
 outbound calls, and conversation transcripts. Real calls are disabled by default.
