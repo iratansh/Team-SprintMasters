@@ -97,6 +97,7 @@ textarea{font:inherit;color:var(--text);background:var(--bg);border:none;border-
   <div class="grid">
     <section class="panel" aria-label="Price rank">
       <div class="ph"><span class="t">PRICE RANK</span><span class="s" id="qsrc">mock data</span></div>
+      <div class="sub" id="qstay" style="margin:-2px 0 8px"></div>
       <div id="queue"></div>
       <div class="actions">
         <button id="previewBtn" style="flex:1">Preview</button>
@@ -260,7 +261,26 @@ function nextIndex(from){
     if(h.call_ready && !h.outcome) return j; }
   return -1;
 }
+function stayLabel(){
+  const parts = iso => String(iso||"").split("-").map(Number);
+  const inn = parts(STAY.check_in), out = parts(STAY.check_out);
+  const guests = +STAY.guests || 1;
+  const guestText = guests===1 ? "1 guest" : `${guests} guests`;
+  if(inn.length!==3 || out.length!==3 || inn.some(n=>!Number.isInteger(n)) || out.some(n=>!Number.isInteger(n))) return guestText;
+  const a = new Date(inn[0], inn[1]-1, inn[2]), b = new Date(out[0], out[1]-1, out[2]);
+  if(Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return `${STAY.check_in} – ${STAY.check_out} · ${guestText}`;
+  const nights = Math.round((b-a)/864e5);
+  const mon = d => d.toLocaleString("en-US",{month:"short"});
+  let range;
+  if(a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth()) range = `${mon(a)} ${a.getDate()}–${b.getDate()}`;
+  else if(a.getFullYear()===b.getFullYear()) range = `${mon(a)} ${a.getDate()} – ${mon(b)} ${b.getDate()}`;
+  else range = `${mon(a)} ${a.getDate()}, ${a.getFullYear()} – ${mon(b)} ${b.getDate()}, ${b.getFullYear()}`;
+  if(!(nights>0)) return `${STAY.check_in} – ${STAY.check_out} · ${guestText}`;
+  const nightText = nights===1 ? "1 night" : `${nights} nights`;
+  return `${range} · ${nightText} · ${guestText}`;
+}
 function renderQueue(){
+  document.getElementById("qstay").textContent = stayLabel();
   const nx = nextIndex(0);
   document.getElementById("queue").innerHTML = hotels.map((h,i)=>{
     let t = h.status==="calling" ? "calling" : h.outcome ? h.outcome : !h.call_ready ? "noph" : i===nx ? "next" : "";
